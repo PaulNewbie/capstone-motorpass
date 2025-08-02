@@ -11,6 +11,15 @@ from datetime import datetime
 import threading
 import time
 
+from controllers.vip import (
+    authenticate_admin_for_vip,
+    process_vip_time_in,
+    process_vip_time_out,
+    get_vip_current_status,
+    get_vip_purposes,
+    validate_vip_plate_format
+)
+
 class MotorPassGUI:
     def __init__(self, system_name, system_version, admin_function, student_function, guest_function):
         self.system_name = system_name
@@ -327,6 +336,7 @@ class MotorPassGUI:
         
         # Bring overlay to front
         self.main_overlay.lift()
+        self.create_vip_button()
         
     def create_enhanced_button(self, parent, text, command, primary_color, secondary_color):
         """Create enhanced styled button with advanced hover effects and icons"""
@@ -378,6 +388,254 @@ class MotorPassGUI:
         """Handle guest button click"""
         self.run_function(self.guest_function, "Guest Verification")
         
+# --------------------------- VIP --------------
+
+    def create_vip_button(self):
+        """Create VIP button in bottom left corner"""
+        vip_button = tk.Button(self.root, text="🔴\nVIP", 
+                              font=("Arial", 12, "bold"), 
+                              bg="#FF4444", fg="white",
+                              width=6, height=3,
+                              bd=0, relief='flat',
+                              cursor="hand2",
+                              command=self.vip_clicked)
+        vip_button.place(x=50, y=self.root.winfo_screenheight()-150)
+        
+        # Make it circular-like with hover effects
+        def vip_on_enter(e):
+            vip_button.config(bg="#FF6666", relief='raised', bd=2)
+        def vip_on_leave(e):
+            vip_button.config(bg="#FF4444", relief='flat', bd=0)
+        
+        vip_button.bind("<Enter>", vip_on_enter)
+        vip_button.bind("<Leave>", vip_on_leave)
+
+    def vip_clicked(self):
+        """Handle VIP button click"""
+        self.open_vip_panel()
+
+    def open_vip_panel(self):
+        """Open VIP panel with single input flow"""
+        # First authenticate admin fingerprint
+        auth_result = authenticate_admin_for_vip()
+        
+        if not auth_result:
+            messagebox.showerror("Authentication Failed", 
+                               "Admin fingerprint authentication required for VIP access!")
+            return
+        
+        # Create VIP window
+        vip_window = tk.Toplevel(self.root)
+        vip_window.title("VIP Access Panel")
+        vip_window.geometry("600x500")
+        vip_window.configure(bg="white")
+        vip_window.resizable(False, False)
+        
+        # Center window
+        vip_window.update_idletasks()
+        x = (vip_window.winfo_screenwidth() // 2) - 300
+        y = (vip_window.winfo_screenheight() // 2) - 250
+        vip_window.geometry(f"600x500+{x}+{y}")
+        
+        # Make modal
+        vip_window.transient(self.root)
+        vip_window.grab_set()
+        
+        # Header
+        header_frame = tk.Frame(vip_window, bg="#FF4444", height=80)
+        header_frame.pack(fill="x")
+        header_frame.pack_propagate(False)
+        
+        tk.Label(header_frame, text="🔴 VIP ACCESS PANEL", 
+                font=("Arial", 24, "bold"), fg="white", bg="#FF4444").pack(expand=True)
+        
+        # Main form frame
+        form_frame = tk.Frame(vip_window, bg="white")
+        form_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        
+        # Instructions
+        instructions = tk.Label(form_frame, 
+                               text="Enter plate number - System will automatically determine TIME IN or TIME OUT",
+                               font=("Arial", 12), 
+                               fg="#666666", bg="white",
+                               justify="center")
+        instructions.pack(pady=(0, 20))
+        
+        # Plate Number field
+        tk.Label(form_frame, text="Plate Number:", 
+                font=("Arial", 12, "bold"), bg="white").pack(anchor="w", pady=(0, 5))
+        plate_entry = tk.Entry(form_frame, font=("Arial", 14), width=40)
+        plate_entry.pack(pady=(0, 20), fill="x")
+        plate_entry.focus_set()
+        
+        # Status display
+        status_label = tk.Label(form_frame, text="Enter plate number to check status", 
+                               font=("Arial", 11, "italic"), 
+                               fg="#666666", bg="white")
+        status_label.pack(pady=(0, 20))
+        
+        # Purpose selection frame (initially hidden)
+        purpose_container = tk.Frame(form_frame, bg="white")
+        purpose_var = tk.StringVar()
+        
+        # Create purpose selection widgets
+        purpose_label = tk.Label(purpose_container, text="Purpose:", 
+                                font=("Arial", 12, "bold"), bg="white")
+        purpose_label.pack(anchor="w", pady=(10, 10))
+        
+        purpose_frame = tk.Frame(purpose_container, bg="white")
+        purpose_frame.pack(fill="x", pady=(0, 20))
+        
+        purposes = get_vip_purposes()
+        purpose_buttons = []
+        
+        for i, purpose in enumerate(purposes):
+            row = i // 2
+            col = i % 2
+            
+            def make_purpose_command(p):
+                return lambda: select_purpose(p)
+            
+            purpose_btn = tk.Button(purpose_frame, text=purpose, 
+                                   font=("Arial", 11), 
+                                   width=15, height=2,
+                                   bg="#f0f0f0", fg="black",
+                                   relief="raised", bd=1,
+                                   cursor="hand2",
+                                   command=make_purpose_command(purpose))
+            purpose_btn.grid(row=row, column=col, padx=10, pady=5, sticky="ew")  # Changed col=col to column=col
+            purpose_buttons.append(purpose_btn)
+            
+            purpose_frame.grid_columnconfigure(col, weight=1)
+        
+        selected_purpose_label = tk.Label(purpose_container, text="Selected: None", 
+                                         font=("Arial", 11, "italic"), 
+                                         fg="#666666", bg="white")
+        selected_purpose_label.pack(pady=(0, 10))
+        
+        def select_purpose(purpose):
+            purpose_var.set(purpose)
+            selected_purpose_label.config(text=f"Selected: {purpose}")
+            # Update button colors
+            for btn in purpose_buttons:
+                if btn['text'] == purpose:
+                    btn.config(bg="#4CAF50", fg="white")
+                else:
+                    btn.config(bg="#f0f0f0", fg="black")
+        
+        def check_plate_status():
+            """Check plate status and show appropriate form"""
+            plate_number = plate_entry.get().strip().upper()
+            
+            if not plate_number:
+                status_label.config(text="Enter plate number to check status", fg="#666666")
+                purpose_container.pack_forget()
+                return
+            
+            # Validate plate format
+            is_valid, validation_msg = validate_vip_plate_format(plate_number)
+            if not is_valid:
+                status_label.config(text=f"Invalid plate: {validation_msg}", fg="#FF0000")
+                purpose_container.pack_forget()
+                return
+            
+            # Determine action
+            action_result = determine_vip_action(plate_number)
+            
+            if action_result['action'] == 'TIME_IN':
+                status_label.config(text="🟢 TIME IN - Select purpose below", fg="#4CAF50")
+                purpose_container.pack(fill="x", pady=(10, 0))
+                purpose_var.set("")  # Reset purpose selection
+                selected_purpose_label.config(text="Selected: None")
+                # Reset button colors
+                for btn in purpose_buttons:
+                    btn.config(bg="#f0f0f0", fg="black")
+            elif action_result['action'] == 'TIME_OUT':
+                vip_info = action_result['vip_info']
+                status_label.config(text=f"🔴 TIME OUT - {vip_info['purpose']} (In: {vip_info['time_in']})", fg="#FF6B6B")
+                purpose_container.pack_forget()
+            else:
+                status_label.config(text=f"Error: {action_result['message']}", fg="#FF0000")
+                purpose_container.pack_forget()
+        
+        # Bind plate entry to check status
+        plate_entry.bind('<KeyRelease>', lambda e: check_plate_status())
+        
+        # Buttons
+        button_frame = tk.Frame(form_frame, bg="white")
+        button_frame.pack(fill="x", pady=(30, 0))
+        
+        def cancel_vip():
+            vip_window.destroy()
+        
+        def submit_vip():
+            plate_number = plate_entry.get().strip().upper()
+            
+            # Validate plate number format
+            is_valid, validation_msg = validate_vip_plate_format(plate_number)
+            if not is_valid:
+                messagebox.showerror("Invalid Plate", validation_msg)
+                return
+            
+            # Determine action
+            action_result = determine_vip_action(plate_number)
+            
+            if action_result['action'] == 'TIME_IN':
+                purpose = purpose_var.get()
+                if not purpose:
+                    messagebox.showerror("Error", "Please select purpose for TIME IN!")
+                    return
+                
+                # Process TIME IN
+                result = process_vip_time_in(plate_number, purpose)
+                
+                if result['success']:
+                    messagebox.showinfo("VIP Time In Success", 
+                                       f"VIP Time In recorded!\n\n" +
+                                       f"Plate: {plate_number}\n" +
+                                       f"Purpose: {purpose}\n" +
+                                       f"Time: {result['timestamp']}")
+                    vip_window.destroy()
+                else:
+                    messagebox.showerror("Error", result['message'])
+            
+            elif action_result['action'] == 'TIME_OUT':
+                # Process TIME OUT
+                result = process_vip_time_out(plate_number)
+                
+                if result['success']:
+                    messagebox.showinfo("VIP Time Out Success", 
+                                       f"VIP Time Out recorded!\n\n" +
+                                       f"Plate: {plate_number}\n" +
+                                       f"Purpose: {result['vip_info']['purpose']}\n" +
+                                       f"Time In: {result['vip_info']['time_in']}\n" +
+                                       f"Time Out: {result['timestamp']}")
+                    vip_window.destroy()
+                else:
+                    messagebox.showerror("Error", result['message'])
+            
+            else:
+                messagebox.showerror("Error", action_result['message'])
+        
+        cancel_btn = tk.Button(button_frame, text="❌ Cancel", 
+                              font=("Arial", 12, "bold"), 
+                              bg="#FF6B6B", fg="white",
+                              padx=20, pady=10,
+                              cursor="hand2",
+                              command=cancel_vip)
+        cancel_btn.pack(side="left")
+        
+        process_btn = tk.Button(button_frame, text="✅ Process VIP", 
+                               font=("Arial", 12, "bold"), 
+                               bg="#4CAF50", fg="white",
+                               padx=20, pady=10,
+                               cursor="hand2",
+                               command=submit_vip)
+        process_btn.pack(side="right")
+        
+        # Enter key binding
+        plate_entry.bind('<Return>', lambda e: submit_vip())
+      
     # MODIFIED ONLY THIS METHOD - added restart logic
     def run_function(self, function, title):
         """Hide GUI and run specified function"""
