@@ -13,7 +13,7 @@ import hashlib
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
-from services.rpi_camera import get_camera
+from ..services.rpi_camera import get_camera
 
 # ============== CONFIGURATION ==============
 
@@ -1212,7 +1212,7 @@ def _retake_prompt(expected_name: str, detected_name: str) -> bool:
     if is_guest_verification:
         try:
             # Use GUI dialog for guest verification
-            from utils.gui_helpers import guest_license_verification_dialog
+            from ..utils.gui_helpers import guest_license_verification_dialog
             
             choice = guest_license_verification_dialog(expected_name, detected_name)
             

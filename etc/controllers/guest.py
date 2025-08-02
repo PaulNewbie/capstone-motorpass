@@ -1,13 +1,15 @@
 # controllers/guest.py - With security code verification for timeout and retake for timing in
 
-from services.license_reader import *
-from services.helmet_infer import verify_helmet
-from services.led_control import *  
-from services.buzzer_control import *
-from services.rpi_camera import force_camera_cleanup
-from utils.display_helpers import display_separator, display_verification_result
-from utils.gui_helpers import show_results_gui, get_guest_info_gui, updated_guest_office_gui
-from utils.timeout_security import timeout_security_verification  # Import security verification
+from etc.services.license_reader import *
+from etc.services.helmet_infer import verify_helmet
+from etc.services.led_control import *  
+from etc.services.buzzer_control import *
+from etc.services.rpi_camera import force_camera_cleanup
+
+from etc.utils.display_helpers import display_separator, display_verification_result
+from etc.utils.gui_helpers import show_results_gui, get_guest_info_gui, updated_guest_office_gui
+from etc.utils.timeout_security import timeout_security_verification 
+
 import difflib
 import time
 
@@ -26,7 +28,7 @@ def guest_verification():
     print("🖥️ Opening GUI interface...")
     
     # Import GUI here to avoid circular imports
-    from ui.guest_gui import GuestVerificationGUI
+    from etc.ui.guest_gui import GuestVerificationGUI
     
     # No cleanup needed at start
     
