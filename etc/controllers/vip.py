@@ -1,11 +1,9 @@
-# controllers/vip.py - VIP Controller
+# controllers/vip.py - Complete VIP Controller
 
 from database.vip_operations import (
     record_vip_time_in, 
     record_vip_time_out, 
-    check_vip_status,
-    get_all_vip_records,
-    get_vip_stats
+    check_vip_status
 )
 
 def authenticate_admin_for_vip():
@@ -32,125 +30,69 @@ def determine_vip_action(plate_number):
         
         plate_number = plate_number.strip().upper()
         
-        # Check if VIP is currently timed in
+        # Check if VIP is currently IN
         vip_status = check_vip_status(plate_number)
         
         if vip_status['found']:
-            # VIP exists and is IN -> TIME OUT
+            # EXISTS in currently-in list → TIME OUT
             return {
                 'action': 'TIME_OUT',
                 'message': f"VIP {plate_number} is currently IN - will TIME OUT",
                 'vip_info': vip_status
             }
         else:
-            # VIP not found or already OUT -> TIME IN
+            # NOT EXISTS in currently-in list → TIME IN
             return {
                 'action': 'TIME_IN',
                 'message': f"VIP {plate_number} not found - will TIME IN"
             }
         
     except Exception as e:
-        print(f"❌ Error determining VIP action: {e}")
         return {
             'action': None,
             'message': f"Error: {str(e)}"
         }
 
 def process_vip_time_in(plate_number, purpose):
-    """Process VIP time in with validation"""
+    """Simple TIME IN process with purpose"""
     try:
-        # Validate inputs
-        if not plate_number or not plate_number.strip():
+        if not purpose or purpose.strip() == "":
             return {
                 'success': False,
-                'message': "Plate number is required!"
+                'message': "Purpose is required for TIME IN!"
             }
         
-        if not purpose or purpose not in ["Official Visit", "Meeting", "Inspection", "Emergency"]:
-            return {
-                'success': False,
-                'message': "Valid purpose is required!"
-            }
-        
-        # Clean plate number
-        plate_number = plate_number.strip().upper()
-        
-        # Record to database
         result = record_vip_time_in(plate_number, purpose)
         
         if result['success']:
-            print(f"✅ VIP Time In processed successfully: {plate_number}")
+            print(f"✅ VIP TIME IN: {plate_number} - {purpose}")
         else:
-            print(f"❌ VIP Time In failed: {result['message']}")
+            print(f"❌ VIP TIME IN failed: {result['message']}")
         
         return result
         
     except Exception as e:
-        print(f"❌ Error processing VIP time in: {e}")
         return {
             'success': False,
-            'message': f"Processing error: {str(e)}"
+            'message': f"TIME IN error: {str(e)}"
         }
 
 def process_vip_time_out(plate_number):
-    """Process VIP time out with validation"""
+    """Simple TIME OUT process"""
     try:
-        # Validate input
-        if not plate_number or not plate_number.strip():
-            return {
-                'success': False,
-                'message': "Plate number is required!"
-            }
-        
-        # Clean plate number
-        plate_number = plate_number.strip().upper()
-        
-        # Record to database
         result = record_vip_time_out(plate_number)
         
         if result['success']:
-            print(f"✅ VIP Time Out processed successfully: {plate_number}")
+            print(f"✅ VIP TIME OUT: {plate_number}")
         else:
-            print(f"❌ VIP Time Out failed: {result['message']}")
+            print(f"❌ VIP TIME OUT failed: {result['message']}")
         
         return result
         
     except Exception as e:
-        print(f"❌ Error processing VIP time out: {e}")
         return {
             'success': False,
-            'message': f"Processing error: {str(e)}"
-        }
-
-def get_vip_current_status(plate_number):
-    """Get current VIP status"""
-    try:
-        if not plate_number or not plate_number.strip():
-            return {'found': False, 'message': "Plate number is required"}
-        
-        plate_number = plate_number.strip().upper()
-        return check_vip_status(plate_number)
-        
-    except Exception as e:
-        print(f"❌ Error getting VIP status: {e}")
-        return {'found': False, 'error': str(e)}
-
-def get_vip_dashboard_data():
-    """Get VIP dashboard data for admin panel"""
-    try:
-        stats = get_vip_stats()
-        current_vips = get_all_vip_records(status='IN')
-        
-        return {
-            'stats': stats,
-            'current_vips': current_vips
-        }
-        
-    except Exception as e:
-        print(f"❌ Error getting VIP dashboard data: {e}")
-        return {
-            'stats': {'current_in': 0, 'today_visits': 0, 'total_records': 0},
-            'current_vips': []
+            'message': f"TIME OUT error: {str(e)}"
         }
 
 def validate_vip_plate_format(plate_number):
