@@ -1,11 +1,11 @@
 # controllers/student.py - FIXED key name for GUI callback
 
-from etc.services.fingerprint import *
-from etc.services.license_reader import *
-from etc.services.helmet_infer import verify_helmet
-from etc.services.led_control import *
-from etc.services.buzzer_control import *
-from etc.services.rpi_camera import force_camera_cleanup
+from services.fingerprint import *
+from services.license_reader import *
+from services.helmet_infer import verify_helmet
+from services.led_control import *
+from services.buzzer_control import *
+from services.rpi_camera import force_camera_cleanup
 
 # Import database operations
 from database.db_operations import (
@@ -14,13 +14,13 @@ from database.db_operations import (
     record_time_out
 )
 
-from etc.utils.display_helpers import display_separator, display_verification_result
-from etc.utils.gui_helpers import show_results_gui
+from utils.display_helpers import display_separator, display_verification_result
+from utils.gui_helpers import show_results_gui
 
 import time
 from datetime import datetime
 import tkinter as tk
-import tkinter.messagebox as msgbox
+import tkinter.messagebox as msgboxx
 
 
 def student_verification():
@@ -29,7 +29,7 @@ def student_verification():
     print("🖥️ Opening GUI interface...")
     
     # Import GUI here to avoid circular imports
-    from etc.ui.student_gui import StudentVerificationGUI
+    from ui.student_gui import StudentVerificationGUI
     
     # Create and run GUI
     gui = StudentVerificationGUI(run_verification_with_gui)

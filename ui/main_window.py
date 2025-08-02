@@ -1,5 +1,3 @@
-# ui/main_window.py - Enhanced MotorPass GUI Interface with Time-In Count
-
 import tkinter as tk
 from tkinter import messagebox
 import os
@@ -11,7 +9,7 @@ from datetime import datetime
 import threading
 import time
 
-from ..controllers.vip import (
+from controllers.vip import (
     authenticate_admin_for_vip,
     determine_vip_action,
     process_vip_time_in,

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 import time
-from ..services.rpi_camera import force_camera_cleanup, CameraContext
+from services.rpi_camera import force_camera_cleanup, CameraContext
 
 # === Helmet Detection Config ===
 MODEL_PATH = "best.onnx"
@@ -17,9 +17,9 @@ CLASS_NAMES = ["Nutshell", "full-face helmet"]
 try:
     session = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
     input_name = session.get_inputs()[0].name
-    print("✅ Helmet detection model loaded successfully")
+    print("? Helmet detection model loaded successfully")
 except Exception as e:
-    print(f"❌ Failed to load helmet detection model: {e}")
+    print(f"? Failed to load helmet detection model: {e}")
     session = None
     input_name = None
 

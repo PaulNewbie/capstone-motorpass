@@ -4,23 +4,23 @@ import sys
 import sqlite3
 import subprocess
 import time
-from etc.ui.main_window import MotorPassGUI
+from ui.main_window import MotorPassGUI
 
 # Import controllers
-from etc.controllers.admin import admin_panel
-from etc.controllers.student import student_verification
-from etc.controllers.guest import guest_verification
+from controllers.admin import admin_panel
+from controllers.student import student_verification
+from controllers.guest import guest_verification
 
 # Import configuration
 from config import SYSTEM_NAME, SYSTEM_VERSION
 
 # Import services
-from etc.services.led_control import (
+from services.led_control import (
     init_led_system, 
     set_led_idle, 
     cleanup_led_system
 )
-from etc.services.rpi_camera import force_camera_cleanup
+from services.rpi_camera import force_camera_cleanup
 from database.db_operations import initialize_all_databases
 
 # Global flag to track if restart is needed

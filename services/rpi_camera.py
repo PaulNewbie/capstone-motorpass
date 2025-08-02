@@ -19,6 +19,7 @@ _camera_state = 'IDLE'  # IDLE, INITIALIZING, ACTIVE, CLEANING
 _last_cleanup_time = 0
 _cleanup_cooldown = 1.0  # Minimum seconds between cleanups
 
+
 def force_camera_cleanup():
     """Smart cleanup of camera resources - only cleans when necessary"""
     global _camera_instance, _camera_state, _last_cleanup_time

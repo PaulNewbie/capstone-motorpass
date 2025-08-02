@@ -1,7 +1,7 @@
 # controllers/admin.py - Updated with GUI integration
 
 from config import ADMIN_MENU
-from etc.services.fingerprint import *
+from services.fingerprint import *
 
 from database.db_operations import (
     get_all_time_records,
@@ -10,7 +10,7 @@ from database.db_operations import (
     get_database_stats,
 )
 
-from etc.utils.display_helpers import (
+from utils.display_helpers import (
     display_menu, 
     get_user_input, 
     confirm_action, 
@@ -252,7 +252,7 @@ def admin_view_enrolled():
         
 def admin_delete_fingerprint(slot_id=None):
     """Delete user fingerprint - SIMPLE FIX"""
-    from etc.services.fingerprint import finger, load_fingerprint_database, save_fingerprint_database
+    from services.fingerprint import finger, load_fingerprint_database, save_fingerprint_database
     
     database = load_fingerprint_database()
     if not database:
@@ -535,7 +535,7 @@ def admin_panel():
     print("🖥️ Opening admin GUI interface...")
     
     # Import GUI here to avoid circular imports
-    from etc.ui.admin_gui import AdminPanelGUI
+    from ui.admin_gui import AdminPanelGUI
     
     # Create admin functions dictionary for GUI
     admin_functions = {

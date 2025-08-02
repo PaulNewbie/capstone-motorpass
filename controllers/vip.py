@@ -9,7 +9,7 @@ from database.vip_operations import (
 def authenticate_admin_for_vip():
     """Authenticate admin fingerprint for VIP access"""
     try:
-        from etc.controllers.admin import authenticate_admin
+        from controllers.admin import authenticate_admin
         
         print("\n🔐 ADMIN AUTHENTICATION REQUIRED FOR VIP ACCESS")
         print("Please place finger on sensor...")
