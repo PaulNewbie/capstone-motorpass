@@ -13,7 +13,7 @@ import hashlib
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
-from services.rpi_camera import get_camera
+from etc.services.rpi_camera import get_camera
 
 # ============== CONFIGURATION ==============
 

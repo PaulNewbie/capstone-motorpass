@@ -9,7 +9,7 @@ from datetime import datetime
 import threading
 import time
 
-from controllers.vip import (
+from etc.controllers.vip import (
     authenticate_admin_for_vip,
     determine_vip_action,
     process_vip_time_in,

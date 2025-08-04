@@ -1,4 +1,4 @@
-from utils.gui_helpers import show_message_gui
+from ..utils.gui_helpers import show_message_gui
 import time
 
 def show_results_gui(title, message):
