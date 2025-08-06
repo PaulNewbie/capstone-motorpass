@@ -505,54 +505,150 @@ def admin_change_fingerprint():
 
 # =================== MAIN ADMIN PANEL WITH GUI ===================
 
-def admin_panel():
-    """Admin panel with GUI interface"""
+def admin_panel(main_window=None):
+    """Simple admin panel with clean GUI authentication and hidden main window"""
     print("\n🔧 ADMIN PANEL")
     
-    # Check if admin fingerprint exists
+    # Check admin fingerprint exists
+    from etc.services.fingerprint import check_admin_fingerprint_exists, enroll_admin_fingerprint
+    
     if not check_admin_fingerprint_exists():
         print("\n🔐 NO ADMIN FINGERPRINT FOUND!")
-        print("⚠️  First-time setup required")
-        
-        if input("\nProceed with admin enrollment? (y/N): ").lower() != 'y':
-            print("❌ Access cancelled.")
+        if input("Setup admin fingerprint? (y/N): ").lower() != 'y':
             return
-        
         if not enroll_admin_fingerprint():
-            print("❌ Enrollment failed. Cannot access admin panel.")
+            print("❌ Setup failed.")
+            return
+        print("✅ Admin setup complete!")
+    
+    # Simple GUI authentication with main window as background
+    print("\n🔐 Opening authentication...")
+    
+    try:
+        import tkinter as tk
+        from etc.services.fingerprint import AdminFingerprintGUI, finger, load_admin_database
+        import adafruit_fingerprint
+        import time
+        import threading
+        
+        # Create GUI with main window as parent (keeps main window visible during auth)
+        admin_gui = AdminFingerprintGUI(parent_window=main_window)
+        
+        def simple_auth():
+            for attempt in range(1, 4):  # 3 attempts
+                admin_gui.root.after(0, lambda a=attempt: admin_gui.update_status(f"👆 Place admin finger (Attempt {a}/3)"))
+                
+                # Wait for finger
+                finger_detected = False
+                for _ in range(100):  # 10 second timeout
+                    try:
+                        if finger.get_image() == adafruit_fingerprint.OK:
+                            finger_detected = True
+                            break
+                    except:
+                        pass
+                    time.sleep(0.1)
+                
+                if not finger_detected:
+                    if attempt < 3:
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("⏰ Timeout! Try again..."))
+                        time.sleep(2)
+                        continue
+                    else:
+                        admin_gui.root.after(0, admin_gui.show_failed)
+                        return
+                
+                # Process
+                admin_gui.root.after(0, lambda: admin_gui.update_status("🔄 Processing..."))
+                try:
+                    if finger.image_2_tz(1) != adafruit_fingerprint.OK:
+                        if attempt < 3:
+                            admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Error! Try again..."))
+                            time.sleep(2)
+                            continue
+                        else:
+                            admin_gui.root.after(0, admin_gui.show_failed)
+                            return
+                except:
+                    if attempt < 3:
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Error! Try again..."))
+                        time.sleep(2)
+                        continue
+                    else:
+                        admin_gui.root.after(0, admin_gui.show_failed)
+                        return
+                
+                # Search
+                admin_gui.root.after(0, lambda: admin_gui.update_status("🔍 Searching..."))
+                try:
+                    if finger.finger_search() != adafruit_fingerprint.OK or finger.finger_id != 1:
+                        if attempt < 3:
+                            admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Not admin! Try again..."))
+                            time.sleep(2)
+                            continue
+                        else:
+                            admin_gui.root.after(0, admin_gui.show_failed)
+                            return
+                except:
+                    if attempt < 3:
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Error! Try again..."))
+                        time.sleep(2)
+                        continue
+                    else:
+                        admin_gui.root.after(0, admin_gui.show_failed)
+                        return
+                
+                # Success!
+                print(f"✅ Admin authenticated! (Confidence: {finger.confidence})")
+                admin_gui.root.after(0, admin_gui.show_success)
+                return
+        
+        # Start auth
+        threading.Thread(target=simple_auth, daemon=True).start()
+        admin_gui.root.wait_window()
+        
+        if not admin_gui.auth_result:
+            print("❌ Authentication failed!")
             return
         
-        print("\n✅ Admin enrolled! You can now access admin panel.")
-        input("Press Enter to continue...")
-    
-    # Authenticate admin BEFORE opening GUI
-    print("\n🔐 ADMIN AUTHENTICATION REQUIRED")
-    if not authenticate_admin():
-        print("❌ Authentication failed! Access denied.")
+    except Exception as e:
+        print(f"❌ GUI Error: {e}")
         return
     
-    print("✅ Authentication successful!")
-    print("🖥️ Opening admin GUI interface...")
+    # Authentication successful - now hide main window and open admin panel
+    print("🖥️ Opening admin panel...")
     
-    # Import GUI here to avoid circular imports
-    from etc.ui.admin_gui import AdminPanelGUI
+    # Hide main window if provided
+    if main_window:
+        print("🔄 Hiding main window...")
+        main_window.withdraw()  # Hide the main window
     
-    # Create admin functions dictionary for GUI
-    admin_functions = {
-        'authenticate': authenticate_admin,  # For re-authentication if needed
-        'enroll': admin_enroll,
-        'view_users': admin_view_enrolled,
-        'delete_fingerprint': admin_delete_fingerprint,
-        'sync': admin_sync_database,
-        'get_time_records': get_all_time_records,
-        'clear_records': admin_clear_time_records,
-        'get_stats': get_database_stats,
-        'change_admin': admin_change_fingerprint,
-        'reset': admin_reset_all
-    }
+    try:
+        from etc.ui.admin_gui import AdminPanelGUI
+        
+        admin_functions = {
+            'authenticate': lambda: True,
+            'enroll': admin_enroll,
+            'view_users': admin_view_enrolled,
+            'delete_fingerprint': admin_delete_fingerprint,
+            'sync': admin_sync_database,
+            'get_time_records': get_all_time_records,
+            'clear_records': admin_clear_time_records,
+            'get_stats': get_database_stats,
+            'change_admin': admin_change_fingerprint,
+            'reset': admin_reset_all
+        }
+        
+        # Create and run admin panel
+        gui = AdminPanelGUI(admin_functions, skip_auth=True)
+        gui.run()
+        
+    except Exception as e:
+        print(f"❌ Admin panel error: {e}")
+    finally:
+        # Always restore main window when admin panel closes
+        if main_window:
+            print("🔄 Restoring main window...")
+            main_window.deiconify()  # Show the main window again
     
-    # Create and run GUI (already authenticated)
-    gui = AdminPanelGUI(admin_functions, skip_auth=True)
-    gui.run()
-    
-    print("\n👋 Admin panel closed")
+    print("👋 Admin panel closed")

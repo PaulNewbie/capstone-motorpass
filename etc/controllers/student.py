@@ -68,50 +68,18 @@ def run_verification_with_gui(status_callback):
         print("✅ Helmet verification successful")
         
         # Step 2: Fingerprint verification
-        status_callback({'current_step': '👆 Please place your finger on the scanner'})
+        status_callback({'current_step': '🔍 Please place your finger on the scanner'})
         status_callback({'fingerprint_status': 'PROCESSING'})
-        
-        try:
-            user_info = authenticate_fingerprint(max_attempts=5)
-        except Exception as e:
-            print(f"❌ Fingerprint error: {e}")
-            user_info = None
+
+        user_info = authenticate_fingerprint(max_attempts=5)
         
         if not user_info:
             status_callback({'fingerprint_status': 'FAILED'})
-            status_callback({'current_step': '❌ Fingerprint authentication failed'})
-            
-            # Simple popup with Try Again button
-            try_again = msgbox.askyesno(
-                "Fingerprint Failed", 
-                "Fingerprint authentication failed.\n\nWould you like to try again?",
-                icon='warning'
-            )
-            
-            if try_again:
-                # One more attempt
-                status_callback({'fingerprint_status': 'PROCESSING'})
-                status_callback({'current_step': '🔄 Retrying fingerprint scan...'})
-                time.sleep(1)
-                
-                try:
-                    user_info = authenticate_fingerprint(max_attempts=5)
-                except Exception as e:
-                    print(f"❌ Fingerprint retry error: {e}")
-                    user_info = None
-                
-                if not user_info:
-                    status_callback({'fingerprint_status': 'FAILED'})
-                    status_callback({'current_step': '❌ Final fingerprint attempt failed'})
-                    set_led_idle()
-                    play_failure()
-                    cleanup_buzzer()
-                    return {'verified': False, 'reason': 'Fingerprint authentication failed'}
-            else:
-                set_led_idle()
-                play_failure()
-                cleanup_buzzer()
-                return {'verified': False, 'reason': 'Fingerprint authentication cancelled'}
+            status_callback({'current_step': '❌ Fingerprint authentication failed - Access Denied'})
+            set_led_idle()
+            play_failure()
+            cleanup_buzzer()
+            return {'verified': False, 'reason': 'Fingerprint authentication failed after 5 attempts'}
         
         status_callback({'fingerprint_status': 'VERIFIED'})
         status_callback({'user_info': user_info})
@@ -228,7 +196,20 @@ def run_verification_with_gui(status_callback):
                 )
                 
                 if image_path:
-                    ocr_text = extract_text_from_image(image_path)
+                    # Student Permit check is now handled in license_reader.py
+                    try:
+                        ocr_text = extract_text_from_image(image_path)
+                    except ValueError as e:
+                        if "STUDENT_PERMIT_DETECTED" in str(e):
+                            print("❌ Student Permit detected - Access denied")
+                            status_callback({'current_step': '❌ Student Permit not allowed - Access denied'})
+                            set_led_idle()
+                            play_failure()
+                            cleanup_buzzer()
+                            return {'verified': False, 'reason': 'Student Permit not allowed'}
+                        else:
+                            raise e
+                    
                     keywords_found = _count_verification_keywords(ocr_text)
                     
                     # FIXED: Also check for name matching, not just license keywords
@@ -292,12 +273,22 @@ def run_verification_with_gui(status_callback):
                 status_callback({'current_step': '🔍 Verifying license against fingerprint...'})
                 
                 # FIXED: Pass the properly formatted fingerprint_info
-                verification_result = complete_verification_flow(
-                    image_path=image_path,
-                    fingerprint_info=fingerprint_info,  # Use the properly formatted fingerprint_info
-                    helmet_verified=True,
-                    license_expiration_valid=license_expiration_valid
-                )
+                try:
+                    verification_result = complete_verification_flow(
+                        image_path=image_path,
+                        fingerprint_info=fingerprint_info,  # Use the properly formatted fingerprint_info
+                        helmet_verified=True,
+                        license_expiration_valid=license_expiration_valid
+                    )
+                except ValueError as e:
+                    if "STUDENT_PERMIT_DETECTED" in str(e):
+                        status_callback({'current_step': '❌ Student Permit detected - Access denied'})
+                        set_led_idle()
+                        play_failure()
+                        cleanup_buzzer()
+                        return {'verified': False, 'reason': 'Student Permit not allowed'}
+                    else:
+                        raise e
                 
                 # Show verification summary
                 verification_summary = {
@@ -384,7 +375,7 @@ def check_license_expiration(user_info):
 
 def check_admin_fingerprint():
     """Enhanced admin fingerprint check with retries and better feedback"""
-    from services.fingerprint import finger
+    from etc.services.fingerprint import finger
     import adafruit_fingerprint
     import time
     

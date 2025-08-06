@@ -95,7 +95,21 @@ def run_guest_verification_with_gui(status_callback):
             # Step 3: Extract name and check guest status
             status_callback({'current_step': '🔍 Processing license information...'})
             
-            ocr_preview = extract_text_from_image(image_path)
+            # Student Permit check is now handled in license_reader.py
+            try:
+                ocr_preview = extract_text_from_image(image_path)
+            except ValueError as e:
+                if "STUDENT_PERMIT_DETECTED" in str(e):
+                    print("❌ Student Permit detected - Access denied")
+                    status_callback({'current_step': '❌ Student Permit not allowed - Access denied'})
+                    safe_delete_temp_file(image_path)
+                    set_led_idle()
+                    play_failure()
+                    cleanup_buzzer()
+                    return {'verified': False, 'reason': 'Student Permit not allowed'}
+                else:
+                    raise e
+            
             ocr_lines = [line.strip() for line in ocr_preview.splitlines() if line.strip()]
             detected_name = extract_guest_name_from_license(ocr_lines)
             
@@ -132,11 +146,21 @@ def run_guest_verification_with_gui(status_callback):
                     status_callback({'current_step': '🔍 Verifying license for timeout...'})
                     
                     # Verify guest and process time out
-                    is_guest_verified = complete_guest_verification_flow(
-                        image_path=image_path,
-                        guest_info=guest_info,
-                        helmet_verified=True
-                    )
+                    try:
+                        is_guest_verified = complete_guest_verification_flow(
+                            image_path=image_path,
+                            guest_info=guest_info,
+                            helmet_verified=True
+                        )
+                    except ValueError as e:
+                        if "STUDENT_PERMIT_DETECTED" in str(e):
+                            status_callback({'current_step': '❌ Student Permit detected - Access denied'})
+                            set_led_idle()
+                            play_failure()
+                            cleanup_buzzer()
+                            return {'verified': False, 'reason': 'Student Permit not allowed'}
+                        else:
+                            raise e
                     
                     if is_guest_verified:
                         time_result = process_guest_time_out(guest_info)
@@ -236,11 +260,21 @@ def run_guest_verification_with_gui(status_callback):
                     'is_guest': True
                 }
                 
-                is_guest_verified = complete_guest_verification_flow(
-                    image_path=image_path,
-                    guest_info=guest_data_for_license,
-                    helmet_verified=True
-                )
+                try:
+                    is_guest_verified = complete_guest_verification_flow(
+                        image_path=image_path,
+                        guest_info=guest_data_for_license,
+                        helmet_verified=True
+                    )
+                except ValueError as e:
+                    if "STUDENT_PERMIT_DETECTED" in str(e):
+                        status_callback({'current_step': '❌ Student Permit detected - Access denied'})
+                        set_led_idle()
+                        play_failure()
+                        cleanup_buzzer()
+                        return {'verified': False, 'reason': 'Student Permit not allowed'}
+                    else:
+                        raise e
                 
                 if is_guest_verified:
                     store_guest_in_database(guest_info_input)

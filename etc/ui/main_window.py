@@ -419,13 +419,30 @@ class MotorPassGUI:
         btn.bind("<Leave>", on_leave)
         btn.bind("<Button-1>", on_click)
         
+    def run_function_with_window(self, function, title):
+        """Run function with main window reference passed"""
+        try:
+            print(f"\n{'='*50}")
+            print(f"?? {title} Started")
+            print(f"{'='*50}")
+            
+            # Pass main window reference to the function
+            function(main_window=self.root)
+            
+            print(f"\n? {title} completed")
+            
+        except Exception as e:
+            print(f"? {title} error: {e}")
+            import traceback
+            traceback.print_exc()
+        
     def student_staff_clicked(self):
         """Handle student button click"""
         self.run_function(self.student_function, "Student/Staff Verification")
         
     def admin_clicked(self):
         """Handle admin button click"""
-        self.run_function(self.admin_function, "Admin Panel")
+        self.run_function_with_window(self.admin_function, "Admin Panel")
         
     def guest_clicked(self):
         """Handle guest button click"""

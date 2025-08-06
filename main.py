@@ -115,9 +115,9 @@ def guest_verification_wrapper():
         RESTART_AFTER_TRANSACTION = True
         raise
 
-def admin_panel_wrapper():
+def admin_panel_wrapper(main_window=None):
     """Wrapper for admin panel - no restart needed"""
-    return admin_panel()
+    return admin_panel(main_window=main_window)
 
 def main_loop():
     """Main application loop with restart logic"""

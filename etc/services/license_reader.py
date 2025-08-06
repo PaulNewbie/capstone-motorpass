@@ -94,6 +94,29 @@ def _cleanup_old_cache():
     except:
         pass
 
+# ============== STUDENT PERMIT DETECTION ==============
+
+def _check_student_permit(text: str) -> bool:
+    """Check if the text contains Student Permit indicators"""
+    text_upper = text.upper()
+    
+    # List of restricted terms/phrases that indicate Student Permit
+    restricted_terms = [
+        "STUDENT PERMIT", "PERMIT NO.", "OR NUMBER", "AMOUNT PAID",
+        "ORNUMBER", "AMOUNTPAID"
+    ]
+    
+    # Check for any restricted terms
+    for term in restricted_terms:
+        if term in text_upper:
+            return True
+    
+    # Additional check: if both "STUDENT" and "PERMIT" appear together
+    if "STUDENT" in text_upper and "PERMIT" in text_upper:
+        return True
+    
+    return False
+
 # ============== IMAGE PROCESSING ==============
 
 def _resize_image_optimal(image: np.ndarray) -> np.ndarray:
@@ -269,7 +292,14 @@ atexit.register(cleanup_all_temp_files)
 # ============== MAIN OCR FUNCTIONS ==============
 
 def extract_text_from_image(image_path: str, config: str = OCR_CONFIG_STANDARD) -> str:
-    return _extract_text_smart(image_path, is_guest=False)
+    text = _extract_text_smart(image_path, is_guest=False)
+    
+    # NEW: Check for Student Permit restriction
+    if _check_student_permit(text):
+        print("❌ Student Permit detected in OCR - Access denied")
+        raise ValueError("STUDENT_PERMIT_DETECTED")
+    
+    return text
 
 def find_best_line_match(input_name: str, ocr_lines: List[str]) -> Tuple[Optional[str], float]:
     best_match, best_score = None, 0.0
@@ -317,6 +347,12 @@ def extract_name_from_lines(image_path: str, reference_name: str = "", best_ocr_
         return extract_guest_name_from_license_simple(image_path)
     
     raw_text = _extract_text_smart(image_path, is_guest=False)
+    
+    # NEW: Check for Student Permit restriction
+    if _check_student_permit(raw_text):
+        print("❌ Student Permit detected in license processing - Access denied")
+        raise ValueError("STUDENT_PERMIT_DETECTED")
+    
     full_text = " ".join(raw_text.splitlines()).upper()
     
     keywords_found = _count_verification_keywords(full_text)
@@ -361,6 +397,12 @@ def extract_name_from_lines(image_path: str, reference_name: str = "", best_ocr_
 
 def extract_guest_name_from_license_simple(image_path: str) -> Dict[str, str]:
     raw_text = _extract_text_smart(image_path, is_guest=True)
+    
+    # NEW: Check for Student Permit restriction for guests
+    if _check_student_permit(raw_text):
+        print("❌ Student Permit detected in guest license processing - Access denied")
+        raise ValueError("STUDENT_PERMIT_DETECTED")
+    
     full_text = " ".join(raw_text.splitlines()).upper()
     
     keywords_found = _count_verification_keywords(full_text)
@@ -824,6 +866,13 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
                         thresh_roi = cv2.threshold(gray_roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
                         quick_text = pytesseract.image_to_string(thresh_roi, config=OCR_CONFIG_FAST).upper()
                         
+                        # NEW: Check for Student Permit in camera preview
+                        if _check_student_permit(quick_text):
+                            print("❌ Student Permit detected in camera preview - Stopping capture")
+                            cv2.destroyAllWindows()
+                            safe_delete_temp_file(temp_filename)
+                            return None
+                        
                         current_keywords = sum(1 for keyword in VERIFICATION_KEYWORDS if keyword in quick_text)
                         
                         # Update keyword history for stability
@@ -1037,11 +1086,37 @@ def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
     
     try:
         while True:
-            basic_text = extract_text_from_image(current_image_path)
+            try:
+                basic_text = extract_text_from_image(current_image_path)
+            except ValueError as e:
+                if "STUDENT_PERMIT_DETECTED" in str(e):
+                    # Return error result for Student Permit
+                    error_packaged = package_name_info(
+                        {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
+                        "Student Permit detected - Access denied", fingerprint_info
+                    )
+                    error_packaged.match_score = 0.0
+                    return error_packaged
+                else:
+                    raise e
+            
             ocr_lines = [line.strip() for line in basic_text.splitlines() if line.strip()]
             name_from_ocr, sim_score = find_best_line_match(reference_name, ocr_lines)
             
-            structured_data = extract_name_from_lines(current_image_path, reference_name, name_from_ocr, sim_score)
+            try:
+                structured_data = extract_name_from_lines(current_image_path, reference_name, name_from_ocr, sim_score)
+            except ValueError as e:
+                if "STUDENT_PERMIT_DETECTED" in str(e):
+                    # Return error result for Student Permit
+                    error_packaged = package_name_info(
+                        {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
+                        "Student Permit detected - Access denied", fingerprint_info
+                    )
+                    error_packaged.match_score = 0.0
+                    return error_packaged
+                else:
+                    raise e
+            
             packaged = package_name_info(structured_data, basic_text, fingerprint_info)
             packaged.match_score = sim_score
             
@@ -1093,12 +1168,47 @@ def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
     
     try:
         while True:
-            basic_text = extract_text_from_image(current_image_path)
+            try:
+                basic_text = extract_text_from_image(current_image_path)
+            except ValueError as e:
+                if "STUDENT_PERMIT_DETECTED" in str(e):
+                    # Return error result for Student Permit
+                    guest_fingerprint_info = {
+                        'name': reference_name,
+                        'confidence': 100,
+                        'user_type': 'GUEST'
+                    }
+                    error_packaged = package_name_info(
+                        {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
+                        "Student Permit detected - Access denied", guest_fingerprint_info
+                    )
+                    error_packaged.match_score = 0.0
+                    return error_packaged
+                else:
+                    raise e
+            
             ocr_lines = [line.strip() for line in basic_text.splitlines() if line.strip()]
             name_from_ocr, sim_score = find_best_line_match(reference_name, ocr_lines)
             
             # Use the same enhanced verification as student/staff
-            structured_data = extract_name_from_lines(current_image_path, reference_name, name_from_ocr, sim_score)
+            try:
+                structured_data = extract_name_from_lines(current_image_path, reference_name, name_from_ocr, sim_score)
+            except ValueError as e:
+                if "STUDENT_PERMIT_DETECTED" in str(e):
+                    # Return error result for Student Permit
+                    guest_fingerprint_info = {
+                        'name': reference_name,
+                        'confidence': 100,
+                        'user_type': 'GUEST'
+                    }
+                    error_packaged = package_name_info(
+                        {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
+                        "Student Permit detected - Access denied", guest_fingerprint_info
+                    )
+                    error_packaged.match_score = 0.0
+                    return error_packaged
+                else:
+                    raise e
             
             # Create guest-specific fingerprint_info for compatibility
             guest_fingerprint_info = {
@@ -1165,6 +1275,11 @@ def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
                 return error_packaged
         
     except Exception:
+        guest_fingerprint_info = {
+            'name': reference_name,
+            'confidence': 100,
+            'user_type': 'GUEST'
+        }
         error_packaged = package_name_info(
             {"Name": "Not Found", "Document Verified": "Failed"}, 
             "Processing failed", guest_fingerprint_info
@@ -1181,6 +1296,10 @@ def get_guest_name_from_license_image(image_path: str) -> str:
         extraction = extract_guest_name_from_license_simple(image_path)
         detected_name = extraction.get('Name', 'Guest')
         return detected_name if detected_name and detected_name != "Guest User" else "Guest"
+    except ValueError as e:
+        if "STUDENT_PERMIT_DETECTED" in str(e):
+            return "STUDENT_PERMIT_DETECTED"
+        return "Guest"
     except Exception:
         return "Guest"
 
@@ -1235,12 +1354,53 @@ def _retake_prompt(expected_name: str, detected_name: str) -> bool:
     choice = input("Retake photo? (y/n): ").strip().lower()
     return choice == 'y'
 
+def _retake_prompt_enhanced(expected_name: str, detected_name: str, is_guest: bool = False) -> str:
+    """
+    Enhanced retake prompt for guests with more options
+    
+    Returns:
+        'retake', 'accept', or 'cancel'
+    """
+    if is_guest:
+        try:
+            from utils.gui_helpers import guest_license_verification_dialog
+            return guest_license_verification_dialog(expected_name, detected_name)
+        except Exception as e:
+            print(f"❌ Error showing guest license dialog: {e}")
+            # Fall back to console
+            print(f"⚠️ Name mismatch: Expected '{expected_name}', found '{detected_name}'")
+            while True:
+                choice = input("(r)etake, (a)ccept, or (c)ancel? ").strip().lower()
+                if choice in ['r', 'retake']:
+                    return 'retake'
+                elif choice in ['a', 'accept']:
+                    return 'accept'
+                elif choice in ['c', 'cancel']:
+                    return 'cancel'
+                else:
+                    print("Invalid choice. Please enter 'r', 'a', or 'c'")
+    else:
+        # Original behavior for students/staff
+        return 'retake' if _retake_prompt(expected_name, detected_name) else 'accept'
+
 # ============== VERIFICATION FLOWS ==============
 
 def complete_verification_flow(image_path: str, fingerprint_info: dict, 
                              helmet_verified: bool = True, 
                              license_expiration_valid: bool = True) -> bool:
-    license_result = licenseRead(image_path, fingerprint_info)
+    try:
+        license_result = licenseRead(image_path, fingerprint_info)
+    except ValueError as e:
+        if "STUDENT_PERMIT_DETECTED" in str(e):
+            print("❌ Student Permit detected - Verification FAILED")
+            return False
+        else:
+            raise e
+    
+    # Check if Student Permit was detected
+    if license_result.name == "STUDENT PERMIT DETECTED":
+        print("❌ Student Permit detected - Verification FAILED")
+        return False
     
     final_name = license_result.name
     final_match_score = license_result.match_score or 0.0
@@ -1279,7 +1439,19 @@ def complete_verification_flow(image_path: str, fingerprint_info: dict,
 
 def complete_guest_verification_flow(image_path: str, guest_info: dict,
                                    helmet_verified: bool = True) -> bool:
-    license_result = licenseReadGuest(image_path, guest_info)
+    try:
+        license_result = licenseReadGuest(image_path, guest_info)
+    except ValueError as e:
+        if "STUDENT_PERMIT_DETECTED" in str(e):
+            print("❌ Student Permit detected - Guest verification FAILED")
+            return False
+        else:
+            raise e
+    
+    # Check if Student Permit was detected
+    if license_result.name == "STUDENT PERMIT DETECTED":
+        print("❌ Student Permit detected - Guest verification FAILED")
+        return False
     
     final_name = license_result.name
     final_match_score = license_result.match_score or 0.0
