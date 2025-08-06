@@ -1,4 +1,4 @@
-# controllers/guest.py - With security code verification for timeout and retake for timing in
+# controllers/guest.py - Fixed Firebase integration
 
 from etc.services.license_reader import *
 from etc.services.helmet_infer import verify_helmet
@@ -11,8 +11,11 @@ from etc.utils.timeout_security import timeout_security_verification
 import difflib
 import time
 
+# FIXED: Import Firebase helper instead of direct import
+from firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
+
 from database.db_operations import (
-    add_guest,
+    add_guest,  # Keep your existing function
     get_guest_time_status,
     get_guest_from_database,
     create_guest_time_data, 
@@ -192,7 +195,7 @@ def run_guest_verification_with_gui(status_callback):
                     }
                 })
                 
-                status_callback({'current_step': '📝 Please provide guest information...'})
+                status_callback({'current_step': '🔍 Please provide guest information...'})
                 
                 # Get guest info (using GUI dialog) - HANDLES RETAKE FROM REGISTRATION FORM
                 guest_info_input = get_guest_info_gui(detected_name)
@@ -201,7 +204,7 @@ def run_guest_verification_with_gui(status_callback):
                 if guest_info_input == 'retake':
                     # User wants to retake license - clean up current image and continue loop
                     print("📷 User requested license retake from registration form")
-                    status_callback({'current_step': '🔄 Retaking license scan...'})
+                    status_callback({'current_step': '📄 Retaking license scan...'})
                     safe_delete_temp_file(image_path)
                     continue  # Go back to the beginning of the while loop
                     
@@ -286,7 +289,7 @@ def run_guest_verification_with_gui(status_callback):
         return {'verified': False, 'reason': str(e)}
               
 def store_guest_in_database(guest_info):
-    """Store or update guest information in the guests table"""
+    """FIXED: Store guest with safe Firebase sync"""
     try:
         guest_data = {
             'full_name': guest_info['name'],
@@ -294,15 +297,44 @@ def store_guest_in_database(guest_info):
             'office_visiting': guest_info['office']
         }
         
-        guest_number = add_guest(guest_data)
+        # Your existing local database save
+        guest_number = add_guest(guest_data)  # Keep your existing function
         
         if guest_number:
             print(f"✅ Guest record saved (Guest No: {guest_number})")
+            
+            # FIXED: Safe Firebase sync
+            try:
+                sync_guest_to_firebase(
+                    guest_info['name'], 
+                    guest_info['plate_number'], 
+                    guest_info['office']
+                )
+                print("🔥 Guest synced to Firebase")
+            except Exception as e:
+                print(f"⚠️  Firebase sync failed: {e}")
+            
             return True
         else:
             print(f"❌ Failed to save guest record")
             return False
-            
     except Exception as e:
         print(f"❌ Error storing guest in database: {e}")
         return False
+
+def check_firebase_sync_status():
+    """FIXED: Check Firebase status safely"""
+    try:
+        status = check_firebase_status()
+        if status:
+            if status['online']:
+                print("🔥 Firebase: CONNECTED ✅")
+            else:
+                print("📴 Firebase: OFFLINE ⚠️")
+            return status
+        else:
+            print("⚠️  Firebase not available")
+            return None
+    except Exception as e:
+        print(f"⚠️  Error checking Firebase: {e}")
+        return None

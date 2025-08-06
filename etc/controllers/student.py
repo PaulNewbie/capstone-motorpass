@@ -20,7 +20,7 @@ from etc.utils.gui_helpers import show_results_gui
 import time
 from datetime import datetime
 import tkinter as tk
-import tkinter.messagebox as msgboxx
+import tkinter.messagebox as msgbox
 
 
 def student_verification():

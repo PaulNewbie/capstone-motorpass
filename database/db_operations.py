@@ -1,4 +1,4 @@
-# database/db_operations.py - Organized Database Operations for MotorPass
+# database/db_operations.py - FIXED Firebase integration
 
 import sqlite3
 import os
@@ -8,6 +8,9 @@ import secrets
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 from database.init_database import MOTORPASS_DB, initialize_all_databases, get_database_stats
+
+# FIXED: Import Firebase helper instead of direct import
+from firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
 
 # =================== STUDENT OPERATIONS ===================
 
@@ -34,6 +37,20 @@ def add_student(student_data: Dict) -> bool:
         
         conn.commit()
         conn.close()
+        
+        # FIXED: Safe Firebase sync
+        try:
+            from firebase_helper import safe_firebase_sync
+            safe_firebase_sync('add_student', 
+                student_data['student_id'],
+                student_data['full_name'], 
+                student_data.get('course', ''),
+                student_data.get('license_number'),
+                student_data.get('plate_number')
+            )
+        except:
+            pass  # Don't fail if Firebase isn't available
+        
         return True
         
     except sqlite3.Error as e:
@@ -129,6 +146,20 @@ def add_staff(staff_data: Dict) -> bool:
         
         conn.commit()
         conn.close()
+        
+        # FIXED: Safe Firebase sync
+        try:
+            from firebase_helper import safe_firebase_sync
+            safe_firebase_sync('add_staff',
+                staff_data['staff_no'],
+                staff_data['full_name'],
+                staff_data.get('staff_role', ''),
+                staff_data.get('license_number'),
+                staff_data.get('plate_number')
+            )
+        except:
+            pass  # Don't fail if Firebase isn't available
+        
         return True
         
     except sqlite3.Error as e:
@@ -450,8 +481,6 @@ def get_guest_time_status(detected_name, plate_number=None):
 def get_guest_from_database(plate_number=None, name=None):
     """Retrieve guest information from guests table - updated without last_visit"""
     try:
-        #from database.db_operations import get_guest_by_plate, get_guest_by_name_and_plate
-        
         if plate_number and name:
             guest_data = get_guest_by_name_and_plate(name, plate_number)
         elif plate_number:
@@ -486,13 +515,21 @@ def create_guest_time_data(guest_info):
     }
 
 def process_guest_time_in(guest_info):
-    """Process guest time in - using new database functions"""
+    """FIXED: Your updated function with safe Firebase sync"""
     try:
-        #from database.db_operations import record_time_in
-        
         guest_time_data = create_guest_time_data(guest_info)
         
+        # Your existing local database save
         if record_time_in(guest_time_data):
+            
+            # FIXED: Safe Firebase sync for time entry
+            try:
+                user_id = f"GUEST_{guest_info['plate_number']}"
+                sync_time_to_firebase(user_id, guest_info['name'], 'GUEST', 'IN')
+                print("🔥 Guest time IN synced to Firebase")
+            except Exception as e:
+                print(f"⚠️  Firebase sync failed: {e}")
+            
             return {
                 'success': True,
                 'status': "✅ GUEST TIME IN SUCCESSFUL",
@@ -506,7 +543,6 @@ def process_guest_time_in(guest_info):
                 'message': "❌ Failed to record TIME IN",
                 'color': "🔴"
             }
-            
     except Exception as e:
         print(f"❌ Error processing TIME IN: {e}")
         return {
@@ -515,15 +551,23 @@ def process_guest_time_in(guest_info):
             'message': f"❌ Error: {e}",
             'color': "🔴"
         }
-
+            
 def process_guest_time_out(guest_info):
-    """Process guest time out - using new database functions"""
+    """FIXED: Your updated function with safe Firebase sync"""
     try:
-        #from database.db_operations import record_time_out
-        
         guest_time_data = create_guest_time_data(guest_info)
         
+        # Your existing local database save
         if record_time_out(guest_time_data):
+            
+            # FIXED: Safe Firebase sync for time entry
+            try:
+                user_id = f"GUEST_{guest_info['plate_number']}"
+                sync_time_to_firebase(user_id, guest_info['name'], 'GUEST', 'OUT')
+                print("🔥 Guest time OUT synced to Firebase")
+            except Exception as e:
+                print(f"⚠️  Firebase sync failed: {e}")
+            
             return {
                 'success': True,
                 'status': "✅ GUEST TIME OUT SUCCESSFUL",
@@ -537,7 +581,6 @@ def process_guest_time_out(guest_info):
                 'message': "❌ Failed to record TIME OUT",
                 'color': "🔴"
             }
-            
     except Exception as e:
         print(f"❌ Error processing TIME OUT: {e}")
         return {
@@ -546,99 +589,6 @@ def process_guest_time_out(guest_info):
             'message': f"❌ Error: {e}",
             'color': "🔴"
         }
-
-# =================== UNIFIED USER LOOKUP ===================
-
-def get_user_by_id(user_id: str) -> Optional[Dict]:
-    """Get user info by ID (works for students, staff, and guests)"""
-    # Try student first
-    student = get_student_by_id(user_id)
-    if student:
-        return student
-    
-    # Try staff
-    staff = get_staff_by_id(user_id)
-    if staff:
-        return staff
-    
-    # Try guest (for GUEST_ prefixed IDs)
-    if user_id.startswith('GUEST_'):
-        plate_number = user_id.replace('GUEST_', '')
-        guest = get_guest_by_plate(plate_number)
-        if guest:
-            return {
-                'guest_id': guest['guest_id'],
-                'full_name': guest['full_name'],
-                'plate_number': guest['plate_number'],
-                'office_visiting': guest['office_visiting'],
-                'user_type': 'GUEST',
-                'unified_id': user_id,
-                'license_number': None,
-                'expiration_date': None
-            }
-    
-    return None
-
-def search_all_users(search_term: str) -> List[Dict]:
-    """Search across all user types"""
-    results = []
-    
-    try:
-        conn = sqlite3.connect(MOTORPASS_DB)
-        cursor = conn.cursor()
-        search_pattern = f"%{search_term}%"
-        
-        # Search students
-        cursor.execute('''
-            SELECT student_id, full_name, course, 'STUDENT' as user_type 
-            FROM students 
-            WHERE student_id LIKE ? OR full_name LIKE ?
-        ''', (search_pattern, search_pattern))
-        
-        for row in cursor.fetchall():
-            results.append({
-                'id': row[0],
-                'name': row[1],
-                'details': row[2],
-                'user_type': row[3]
-            })
-        
-        # Search staff
-        cursor.execute('''
-            SELECT staff_no, full_name, staff_role, 'STAFF' as user_type 
-            FROM staff 
-            WHERE staff_no LIKE ? OR full_name LIKE ?
-        ''', (search_pattern, search_pattern))
-        
-        for row in cursor.fetchall():
-            results.append({
-                'id': row[0],
-                'name': row[1],
-                'details': row[2],
-                'user_type': row[3]
-            })
-        
-        # Search guests
-        cursor.execute('''
-            SELECT plate_number, full_name, office_visiting, 'GUEST' as user_type 
-            FROM guests 
-            WHERE plate_number LIKE ? OR full_name LIKE ?
-        ''', (search_pattern, search_pattern))
-        
-        for row in cursor.fetchall():
-            results.append({
-                'id': f"GUEST_{row[0]}",
-                'name': row[1],
-                'details': row[2],
-                'user_type': row[3]
-            })
-        
-        conn.close()
-        return results
-        
-    except sqlite3.Error as e:
-        print(f"❌ Error searching users: {e}")
-        return []
 
 # =================== TIME TRACKING OPERATIONS ===================
 
@@ -658,8 +608,8 @@ def get_student_time_status(user_id: str) -> Optional[str]:
         print(f"❌ Error fetching status: {e}")
         return 'OUT'
 
-def record_time_in(user_info: Dict) -> bool:
-    """Record TIME IN for any user"""
+def record_time_in(user_info):
+    """FIXED: Your updated function with safe Firebase sync"""
     try:
         conn = sqlite3.connect(MOTORPASS_DB)
         cursor = conn.cursor()
@@ -670,13 +620,12 @@ def record_time_in(user_info: Dict) -> bool:
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
-        # Record in time_tracking
+        # Your existing local database save
         cursor.execute('''
             INSERT INTO time_tracking (user_id, user_name, user_type, action, date, time)
             VALUES (?, ?, ?, 'IN', ?, ?)
         ''', (user_id, user_name, user_type, current_date, current_time))
         
-        # Update current_status
         cursor.execute('''
             INSERT OR REPLACE INTO current_status (user_id, user_name, user_type, status)
             VALUES (?, ?, ?, 'IN')
@@ -684,14 +633,22 @@ def record_time_in(user_info: Dict) -> bool:
         
         conn.commit()
         conn.close()
+        
+        # FIXED: Safe Firebase sync
+        try:
+            sync_time_to_firebase(user_id, user_name, user_type, 'IN')
+            print("🔥 Time IN synced to Firebase")
+        except Exception as e:
+            print(f"⚠️  Firebase sync failed: {e}")
+        
         return True
         
-    except sqlite3.Error as e:
+    except Exception as e:
         print(f"❌ Error recording time in: {e}")
         return False
-
+        
 def record_time_out(user_info: Dict) -> bool:
-    """Record TIME OUT for any user"""
+    """FIXED: Record TIME OUT for any user with safe Firebase sync"""
     try:
         conn = sqlite3.connect(MOTORPASS_DB)
         cursor = conn.cursor()
@@ -716,6 +673,14 @@ def record_time_out(user_info: Dict) -> bool:
         
         conn.commit()
         conn.close()
+        
+        # FIXED: Safe Firebase sync
+        try:
+            sync_time_to_firebase(user_id, user_name, user_type, 'OUT')
+            print("🔥 Time OUT synced to Firebase")
+        except Exception as e:
+            print(f"⚠️  Firebase sync failed: {e}")
+        
         return True
         
     except sqlite3.Error as e:
@@ -815,15 +780,129 @@ def clear_all_time_records() -> bool:
         print(f"❌ Error clearing time records: {e}")
         return False
 
-# =================== LEGACY COMPATIBILITY ===================
+def check_firebase_status_in_motorpass():
+    """FIXED: Add this function to check Firebase status from anywhere in your system"""
+    
+    print("\n🔥 FIREBASE SYNC STATUS")
+    print("=" * 30)
+    
+    try:
+        status = check_firebase_status()
+        
+        if status:
+            if status['online']:
+                print("🌐 Firebase: CONNECTED ✅")
+                print("📤 Data syncing instantly")
+            else:
+                print("🔴 Firebase: OFFLINE ⚠️")
+                print("💾 Data saving locally (will sync when online)")
+            
+            if status['queue_size'] > 0:
+                print(f"📋 Pending sync: {status['queue_size']} items")
+            else:
+                print("✅ All data synced!")
+        else:
+            print("⚠️  Firebase not available")
+            print("💾 System working in local mode only")
+        
+        return status
+        
+    except Exception as e:
+        print(f"⚠️  Error checking Firebase: {e}")
+        return None
 
-def init_student_database():
-    """Legacy compatibility"""
-    return initialize_all_databases()
+# =================== UNIFIED USER LOOKUP ===================
 
-def init_time_database():
-    """Legacy compatibility"""
-    return initialize_all_databases()
+def get_user_by_id(user_id: str) -> Optional[Dict]:
+    """Get user info by ID (works for students, staff, and guests)"""
+    # Try student first
+    student = get_student_by_id(user_id)
+    if student:
+        return student
+    
+    # Try staff
+    staff = get_staff_by_id(user_id)
+    if staff:
+        return staff
+    
+    # Try guest (for GUEST_ prefixed IDs)
+    if user_id.startswith('GUEST_'):
+        plate_number = user_id.replace('GUEST_', '')
+        guest = get_guest_by_plate(plate_number)
+        if guest:
+            return {
+                'guest_id': guest['guest_id'],
+                'full_name': guest['full_name'],
+                'plate_number': guest['plate_number'],
+                'office_visiting': guest['office_visiting'],
+                'user_type': 'GUEST',
+                'unified_id': user_id,
+                'license_number': None,
+                'expiration_date': None
+            }
+    
+    return None
+
+def search_all_users(search_term: str) -> List[Dict]:
+    """Search across all user types"""
+    results = []
+    
+    try:
+        conn = sqlite3.connect(MOTORPASS_DB)
+        cursor = conn.cursor()
+        search_pattern = f"%{search_term}%"
+        
+        # Search students
+        cursor.execute('''
+            SELECT student_id, full_name, course, 'STUDENT' as user_type 
+            FROM students 
+            WHERE student_id LIKE ? OR full_name LIKE ?
+        ''', (search_pattern, search_pattern))
+        
+        for row in cursor.fetchall():
+            results.append({
+                'id': row[0],
+                'name': row[1],
+                'details': row[2],
+                'user_type': row[3]
+            })
+        
+        # Search staff
+        cursor.execute('''
+            SELECT staff_no, full_name, staff_role, 'STAFF' as user_type 
+            FROM staff 
+            WHERE staff_no LIKE ? OR full_name LIKE ?
+        ''', (search_pattern, search_pattern))
+        
+        for row in cursor.fetchall():
+            results.append({
+                'id': row[0],
+                'name': row[1],
+                'details': row[2],
+                'user_type': row[3]
+            })
+        
+        # Search guests
+        cursor.execute('''
+            SELECT plate_number, full_name, office_visiting, 'GUEST' as user_type 
+            FROM guests 
+            WHERE plate_number LIKE ? OR full_name LIKE ?
+        ''', (search_pattern, search_pattern))
+        
+        for row in cursor.fetchall():
+            results.append({
+                'id': f"GUEST_{row[0]}",
+                'name': row[1],
+                'details': row[2],
+                'user_type': row[3]
+            })
+        
+        conn.close()
+        return results
+        
+    except sqlite3.Error as e:
+        print(f"❌ Error searching users: {e}")
+        return []
 
 def get_time_records_by_date(date: str) -> List[Dict]:
     """Get time records for a specific date"""
@@ -855,7 +934,17 @@ def get_time_records_by_date(date: str) -> List[Dict]:
     except sqlite3.Error as e:
         print(f"❌ Error fetching records by date: {e}")
         return []
-        
+
+# =================== LEGACY COMPATIBILITY ===================
+
+def init_student_database():
+    """Legacy compatibility"""
+    return initialize_all_databases()
+
+def init_time_database():
+    """Legacy compatibility"""
+    return initialize_all_databases()
+
 # =================== SECURITY FUNCTIONS ===================
 
 def _hash_password(password: str, salt: str) -> str:

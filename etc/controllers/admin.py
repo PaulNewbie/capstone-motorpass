@@ -337,7 +337,7 @@ def admin_sync_database():
         
         # Google Sheets authentication
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("json_folder/credentials.json", scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_name("json_folder/spreadsheet_credentials.json", scope)
         client = gspread.authorize(creds)
         
         # Open the spreadsheet
@@ -450,7 +450,7 @@ def admin_sync_database():
         
     except FileNotFoundError:
         print("❌ credentials.json not found!")
-        print("💡 Please ensure json_folder/credentials.json exists")
+        print("💡 Please ensure json_folder/spreadsheet_credentials.json exists")
         
     except Exception as e:
         print(f"❌ Sync failed: {e}")
