@@ -10,8 +10,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 # Import our modules
-from firebase.config import FIREBASE_PROJECT_ID, FIREBASE_CREDENTIALS, COLLECTIONS
-from firebase.queue import queue_manager
+from etc.firebase.config import FIREBASE_PROJECT_ID, FIREBASE_CREDENTIALS, COLLECTIONS
+from etc.firebase.queue import queue_manager
 from database.init_database import MOTORPASS_DB
 
 # Try to import Firebase

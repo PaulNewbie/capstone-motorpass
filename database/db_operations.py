@@ -10,7 +10,7 @@ from typing import Optional, Dict, List, Tuple
 from database.init_database import MOTORPASS_DB, initialize_all_databases, get_database_stats
 
 # FIXED: Import Firebase helper instead of direct import
-from firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
+from etc.utils.firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
 
 # =================== STUDENT OPERATIONS ===================
 
@@ -40,7 +40,7 @@ def add_student(student_data: Dict) -> bool:
         
         # FIXED: Safe Firebase sync
         try:
-            from firebase_helper import safe_firebase_sync
+            from etc.utils.firebase_helper import safe_firebase_sync
             safe_firebase_sync('add_student', 
                 student_data['student_id'],
                 student_data['full_name'], 
@@ -149,7 +149,7 @@ def add_staff(staff_data: Dict) -> bool:
         
         # FIXED: Safe Firebase sync
         try:
-            from firebase_helper import safe_firebase_sync
+            from etc.utils.firebase_helper import safe_firebase_sync
             safe_firebase_sync('add_staff',
                 staff_data['staff_no'],
                 staff_data['full_name'],

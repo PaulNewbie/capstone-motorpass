@@ -7,7 +7,7 @@ def safe_firebase_sync(sync_function, *args, **kwargs):
     """Safely call Firebase sync functions with error handling"""
     try:
         # Try to import Firebase functions
-        from firebase.sync import add_guest as firebase_add_guest, record_entry, get_status
+        from etc.firebase.sync import add_guest as firebase_add_guest, record_entry, get_status
         
         # Call the requested function
         if sync_function == 'add_guest':

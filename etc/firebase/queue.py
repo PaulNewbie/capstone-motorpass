@@ -5,7 +5,7 @@ import os
 import threading
 import time
 from datetime import datetime
-from firebase.config import SYNC_QUEUE_FILE, CONNECTION_CHECK_INTERVAL, MAX_QUEUE_SIZE, COLLECTIONS
+from etc.firebase.config import SYNC_QUEUE_FILE, CONNECTION_CHECK_INTERVAL, MAX_QUEUE_SIZE, COLLECTIONS
 
 class QueueManager:
     """Manages offline sync queue"""

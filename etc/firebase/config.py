@@ -28,4 +28,4 @@ CONNECTION_CHECK_INTERVAL = 30
 MAX_QUEUE_SIZE = 1000
 
 # File to store offline sync queue
-SYNC_QUEUE_FILE = "firebase_sync_queue.json"
+SYNC_QUEUE_FILE = "json_folder/firebase_sync_queue.json"

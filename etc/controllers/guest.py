@@ -12,7 +12,7 @@ import difflib
 import time
 
 # FIXED: Import Firebase helper instead of direct import
-from firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
+from etc.utils.firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
 
 from database.db_operations import (
     add_guest,  # Keep your existing function
