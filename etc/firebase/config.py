@@ -16,7 +16,8 @@ COLLECTIONS = {
     'staff': 'staff',
     'students': 'students',
     'time_tracking': 'time_tracking',
-    'current_status': 'current_status'
+    'current_status': 'current_status',
+    'vip_records': 'vip_records'
 }
 
 # =================== SYNC SETTINGS ===================
