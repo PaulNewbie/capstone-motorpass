@@ -9,10 +9,11 @@ from PIL import Image, ImageTk
 import json
 
 class AdminPanelGUI:
-    def __init__(self, admin_functions, skip_auth=False):
+    def __init__(self, admin_functions, skip_auth=False, user_role="super_admin"):
         self.root = tk.Tk()
         self.admin_functions = admin_functions
         self.authenticated = skip_auth
+        self.user_role = user_role
         
         self.colors = {
             'primary': '#2C3E50',      # Dark blue-gray
@@ -34,6 +35,16 @@ class AdminPanelGUI:
             self.show_admin_panel()
         else:
             self.create_authentication_screen()
+            
+    def has_access(self, function_name):
+        """Check if current user role has access to a function"""
+        if self.user_role == "super_admin":
+            return True
+        elif self.user_role == "guard":
+            # Guard can only access enroll and sync
+            allowed_functions = ["enroll", "sync"]
+            return function_name in allowed_functions
+        return False
         
     # Menu Action Functions
     def enroll_user(self):
@@ -1004,9 +1015,15 @@ class AdminPanelGUI:
                 bg=self.colors['dark']).pack(anchor="w", pady=(5, 0))
     
     def create_menu_cards(self, parent):
-        """Create enhanced menu cards - FIXED with proper row3 definition"""
+        """Create enhanced menu cards with access control"""
         # Title
-        tk.Label(parent, text="SYSTEM FUNCTIONS", 
+        title_text = "SYSTEM FUNCTIONS"
+        if self.user_role == "guard":
+            title_text += " (Guard Access)"
+        elif self.user_role == "super_admin":
+            title_text += " (Super Admin Access)"
+            
+        tk.Label(parent, text=title_text, 
                 font=("Arial", 20, "bold"), fg=self.colors['primary'], 
                 bg=self.colors['white']).pack(pady=(20, 30))
         
@@ -1014,49 +1031,59 @@ class AdminPanelGUI:
         cards_container = tk.Frame(parent, bg=self.colors['white'])
         cards_container.pack(fill="both", expand=True, padx=40)
         
-        # Create three rows of cards - FIXED
+        # Create three rows of cards
         row1 = tk.Frame(cards_container, bg=self.colors['white'])
         row1.pack(fill="x", pady=(0, 20))
         
         row2 = tk.Frame(cards_container, bg=self.colors['white'])
         row2.pack(fill="x", pady=(0, 20))
         
-        row3 = tk.Frame(cards_container, bg=self.colors['white'])  # FIXED: Now properly defined
+        row3 = tk.Frame(cards_container, bg=self.colors['white'])
         row3.pack(fill="x")
         
         # Row 1 cards
         self.create_function_card(row1, "👤", "Enroll New User", 
                                  "Register student/staff with fingerprint",
-                                 self.enroll_user, self.colors['success'])
+                                 self.enroll_user, self.colors['success'], "enroll")
         
         self.create_function_card(row1, "👥", "View Users", 
                                  "Display all registered users",
-                                 self.view_users, self.colors['info'])
+                                 self.view_users, self.colors['info'], "view_users")
         
         self.create_function_card(row1, "🗑️", "Delete User", 
                                  "Remove user fingerprint",
-                                 self.delete_user, self.colors['accent'])
+                                 self.delete_user, self.colors['accent'], "delete_fingerprint")
         
         # Row 2 cards
         self.create_function_card(row2, "🔄", "Sync Database", 
                                  "Import from Google Sheets",
-                                 self.sync_database, self.colors['warning'])
+                                 self.sync_database, self.colors['warning'], "sync")
         
         self.create_function_card(row2, "🕒", "Time Records", 
                                  "View attendance history",
-                                 self.view_time_records, self.colors['secondary'])
+                                 self.view_time_records, self.colors['secondary'], "get_time_records")
         
         self.create_function_card(row2, "🧹", "Clear Records", 
                                  "Delete time records",
-                                 self.clear_time_records, self.colors['dark'])
+                                 self.clear_time_records, self.colors['dark'], "clear_records")
         
-        # Row 3 - NEW: System Maintenance (Office Management)
+        # Row 3 - System Maintenance
         self.create_function_card(row3, "🏢", "System Maintenance", 
                                  "Manage visitor offices & security codes",
-                                 self.show_office_management, self.colors['gold'])
-    
-    def create_function_card(self, parent, icon, title, description, command, color):
-        """Create an enhanced function card"""
+                                 self.show_office_management, self.colors['gold'], "system_maintenance")
+
+
+    def create_function_card(self, parent, icon, title, description, command, color, function_name=None):
+        """Create an enhanced function card with access control"""
+        # Check access
+        has_access = True
+        if function_name:
+            has_access = self.has_access(function_name)
+        
+        # Adjust colors for restricted access
+        if not has_access:
+            color = '#CCCCCC'
+            
         # Card frame with shadow
         card_container = tk.Frame(parent, bg=self.colors['white'])
         card_container.pack(side="left", fill="both", expand=True, padx=10)
@@ -1082,20 +1109,42 @@ class AdminPanelGUI:
                              bg=self.colors['white'], fg=color)
         icon_label.place(relx=0.5, rely=0.5, anchor='center')
         
-        # Title
-        tk.Label(content, text=title, font=("Arial", 14, "bold"), 
-                fg=self.colors['dark'], bg=self.colors['light']).pack(pady=(0, 5))
+        # Title - grey out if no access
+        title_color = self.colors['dark'] if has_access else '#999999'
+        title_label = tk.Label(content, text=title, font=("Arial", 14, "bold"), 
+                              fg=title_color, bg=self.colors['light'])
+        title_label.pack(pady=(0, 5))
         
-        # Description
-        tk.Label(content, text=description, font=("Arial", 10), 
-                fg=self.colors['secondary'], bg=self.colors['light'],
-                wraplength=150).pack()
+        # Description - grey out if no access
+        desc_color = self.colors['secondary'] if has_access else '#BBBBBB'
+        if not has_access:
+            description_text = description + " (Access Restricted)"
+        else:
+            description_text = description
+            
+        desc_label = tk.Label(content, text=description_text, font=("Arial", 10), 
+                             fg=desc_color, bg=self.colors['light'], wraplength=150)
+        desc_label.pack()
         
-        # Make entire card clickable
-        for widget in [card, content, icon_frame, icon_label]:
-            widget.bind("<Button-1>", lambda e: command())
-            widget.config(cursor="hand2")
-    
+        # Make card clickable based on access
+        clickable_widgets = [card, content, icon_frame, icon_label, title_label, desc_label]
+        
+        if has_access:
+            # Enable access - normal click behavior
+            for widget in clickable_widgets:
+                widget.bind("<Button-1>", lambda e: command())
+                widget.config(cursor="hand2")
+        else:
+            # Restrict access - show access denied message
+            def show_access_denied(event=None):
+                messagebox.showwarning("Access Denied", 
+                                     f"Your role ({self.user_role}) does not have access to this function.\n\n" +
+                                     "Only Super Admin can access this feature.")
+            
+            for widget in clickable_widgets:
+                widget.bind("<Button-1>", show_access_denied)
+                widget.config(cursor="X_cursor")
+                    
     def create_enhanced_footer(self, parent):
         """Create enhanced footer"""
         footer = tk.Frame(parent, bg=self.colors['dark'], height=70)
@@ -1109,16 +1158,21 @@ class AdminPanelGUI:
         buttons_frame = tk.Frame(footer_content, bg=self.colors['dark'])
         buttons_frame.pack(pady=15)
         
-        # Dashboard button
-        dash_btn = tk.Button(buttons_frame, text="📊 WEB DASHBOARD", 
-                            font=("Arial", 12, "bold"), 
-                            bg=self.colors['gold'], fg=self.colors['dark'],
-                            activebackground=self.colors['warning'],
-                            padx=25, pady=10, cursor="hand2", relief='flat', bd=0,
-                            command=self.open_dashboard)
-        dash_btn.pack(side="left", padx=10)
+        # Dashboard button (only for super admin)
+        if self.user_role == "super_admin":
+            dash_btn = tk.Button(buttons_frame, text="📊 WEB DASHBOARD", 
+                                font=("Arial", 12, "bold"), 
+                                bg=self.colors['gold'], fg=self.colors['dark'],
+                                activebackground=self.colors['warning'],
+                                padx=25, pady=10, cursor="hand2", relief='flat', bd=0,
+                                command=self.open_dashboard)
+            dash_btn.pack(side="left", padx=10)
+            
+            # Add hover effects
+            dash_btn.bind("<Enter>", lambda e: dash_btn.config(bg=self.colors['warning']))
+            dash_btn.bind("<Leave>", lambda e: dash_btn.config(bg=self.colors['gold']))
         
-        # Exit button
+        # Exit button (always show for everyone)
         exit_btn = tk.Button(buttons_frame, text="🚪 EXIT ADMIN PANEL", 
                             font=("Arial", 12, "bold"), 
                             bg=self.colors['accent'], fg=self.colors['white'],
@@ -1127,10 +1181,7 @@ class AdminPanelGUI:
                             command=self.exit_system)
         exit_btn.pack(side="left", padx=10)
         
-        # Add hover effects
-        dash_btn.bind("<Enter>", lambda e: dash_btn.config(bg=self.colors['warning']))
-        dash_btn.bind("<Leave>", lambda e: dash_btn.config(bg=self.colors['gold']))
-        
+        # Add hover effects for exit button
         exit_btn.bind("<Enter>", lambda e: exit_btn.config(bg='#C0392B'))
         exit_btn.bind("<Leave>", lambda e: exit_btn.config(bg=self.colors['accent']))
 

@@ -756,15 +756,14 @@ def check_admin_fingerprint_exists():
         return False
 
 def enroll_admin_fingerprint():
-    """Enroll admin fingerprint in slot 1"""
-    print(f"\n🔐 ADMIN FINGERPRINT ENROLLMENT")
-    print("⚠️  This will enroll the admin fingerprint at slot #1")
+    """Enroll admin fingerprint (Super Admin)"""
+    print("\n🔐 ENROLL SUPER ADMIN FINGERPRINT")
     
-    # Check if admin exists
+    # Check if admin already exists
     try:
         admin_db = load_admin_database()
         if "1" in admin_db:
-            print(f"⚠️  Admin fingerprint already exists!")
+            print(f"⚠️  Super admin already exists: {admin_db['1'].get('name', 'Unknown')}")
             if input("Replace it? (y/N): ").lower() != 'y':
                 print("❌ Cancelled.")
                 return False
@@ -772,64 +771,63 @@ def enroll_admin_fingerprint():
         pass
     
     # Get admin name
-    admin_name = input("Enter admin name: ").strip()
+    admin_name = input("Enter super admin name: ").strip()
     if not admin_name:
-        print("❌ Admin name required.")
+        print("❌ Super admin name required.")
         return False
     
-    # Enroll fingerprint at slot 1
-    print(f"🔒 Enrolling admin fingerprint at slot #1")
+    print(f"👤 Enrolling super admin: {admin_name}")
     
+    # Fingerprint enrollment process (same as before)
     for fingerimg in range(1, 3):
-        if fingerimg == 1:
-            print("👆 Place finger on sensor for first scan...")
-        else:
-            print("👆 Place same finger again for second scan...")
+        print(f"👆 Place finger {'(first time)' if fingerimg == 1 else '(again)'}...", end="")
         
         while finger.get_image() != adafruit_fingerprint.OK:
-            pass
-        
+            print(".", end="")
+        print("✅")
+
         print("🔄 Processing...", end="")
         if finger.image_2_tz(fingerimg) != adafruit_fingerprint.OK:
             print("❌ Failed")
             return False
         print("✅")
-        
+
         if fingerimg == 1:
-            print("🔄 Remove finger")
+            print("✋ Remove finger")
             time.sleep(1)
-            while finger.get_image() == adafruit_fingerprint.OK:
+            while finger.get_image() != adafruit_fingerprint.NOFINGER:
                 pass
-    
-    # Create template
-    print("🔄 Creating template...", end="")
+
+    print("🗝️ Creating model...", end="")
     if finger.create_model() != adafruit_fingerprint.OK:
         print("❌ Failed")
         return False
     print("✅")
-    
-    # Store at slot 1
-    print("💾 Storing at slot #1...", end="")
-    if finger.store_model(1) != adafruit_fingerprint.OK:
-        print("❌ Failed")
-        return False
-    print("✅")
-    
-    # Save to database
-    admin_db = load_admin_database()
-    admin_db["1"] = {
-        "name": admin_name,
-        "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "slot": 1
-    }
-    save_admin_database(admin_db)
-    
-    print(f"✅ Admin fingerprint enrolled successfully!")
-    print(f"👤 Admin: {admin_name}")
-    print(f"🔒 Slot: #1")
-    
-    return True
 
+    print(f"💾 Storing...", end="")
+    if finger.store_model(1) == adafruit_fingerprint.OK:
+        print("✅")
+        
+        # Save super admin info
+        admin_db = load_admin_database()
+        admin_db["1"] = {
+            "name": admin_name,
+            "role": "super_admin",
+            "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        save_admin_database(admin_db)
+        
+        # Save role mapping
+        roles_db = load_admin_roles()
+        roles_db["1"] = "super_admin"
+        save_admin_roles(roles_db)
+        
+        print(f"🎉 Super admin enrolled: {admin_name}")
+        return True
+    else:
+        print("❌ Storage failed")
+        return False
+        
 # =================== USER ENROLLMENT FUNCTIONS ===================
 
 def get_user_id_gui():
@@ -1394,7 +1392,255 @@ def init_fingerprint_service():
     except Exception as e:
         print(f"❌ Initialization failed: {e}")
         return False
+        
+# ================== Admin Roles
 
+def load_admin_roles():
+    """Load admin roles database"""
+    try:
+        with open("data/admin_roles.json", "r") as f:
+            return json.load(f)
+    except:
+        # Default: slot 1 is super_admin
+        return {"1": "super_admin"}
+
+def save_admin_roles(roles_db):
+    """Save admin roles database"""
+    try:
+        os.makedirs("data", exist_ok=True)
+        with open("data/admin_roles.json", "w") as f:
+            json.dump(roles_db, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"❌ Error saving admin roles: {e}")
+        return False
+
+def enroll_guard_fingerprint():
+    """Enroll a new guard fingerprint"""
+    print("\n🛡️ ENROLL GUARD FINGERPRINT")
+    
+    # Check if admin slot 1 exists (super admin)
+    admin_db = load_admin_database()
+    if "1" not in admin_db:
+        print("❌ Super admin must be enrolled first!")
+        return False
+    
+    # Find next available slot (2, 3, 4, etc. for guards)
+    roles_db = load_admin_roles()
+    used_slots = [int(k) for k in admin_db.keys()]
+    
+    # Find first available slot starting from 2
+    guard_slot = None
+    for slot in range(2, 11):  # Support up to 10 admin accounts
+        if slot not in used_slots:
+            guard_slot = slot
+            break
+    
+    if guard_slot is None:
+        print("❌ No available slots for guard!")
+        return False
+    
+    print(f"📍 Using slot #{guard_slot} for guard")
+    
+    # Get guard name
+    guard_name = input("Enter guard name: ").strip()
+    if not guard_name:
+        print("❌ Guard name required.")
+        return False
+    
+    print(f"🛡️ Enrolling guard: {guard_name}")
+    
+    # Fingerprint enrollment process
+    for fingerimg in range(1, 3):
+        print(f"👆 Place guard finger {'(first time)' if fingerimg == 1 else '(again)'}...", end="")
+        
+        while finger.get_image() != adafruit_fingerprint.OK:
+            print(".", end="")
+        print("✅")
+
+        print("🔄 Processing...", end="")
+        if finger.image_2_tz(fingerimg) != adafruit_fingerprint.OK:
+            print("❌ Failed")
+            return False
+        print("✅")
+
+        if fingerimg == 1:
+            print("✋ Remove finger")
+            time.sleep(1)
+            while finger.get_image() != adafruit_fingerprint.NOFINGER:
+                pass
+
+    print("🗝️ Creating model...", end="")
+    if finger.create_model() != adafruit_fingerprint.OK:
+        print("❌ Failed")
+        return False
+    print("✅")
+
+    print(f"💾 Storing in slot {guard_slot}...", end="")
+    if finger.store_model(guard_slot) == adafruit_fingerprint.OK:
+        print("✅")
+        
+        # Save guard info to admin database
+        admin_db[str(guard_slot)] = {
+            "name": guard_name,
+            "role": "guard",
+            "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        save_admin_database(admin_db)
+        
+        # Save role mapping
+        roles_db[str(guard_slot)] = "guard"
+        save_admin_roles(roles_db)
+        
+        print(f"🎉 Guard enrolled: {guard_name} (Slot #{guard_slot})")
+        return True
+    else:
+        print("❌ Storage failed")
+        return False
+
+def authenticate_admin_with_role(max_attempts=3):
+    """Authenticate admin and return role based on slot number - SIMPLE VERSION"""
+    print(f"\n🔐 ADMIN AUTHENTICATION")
+    
+    # Show GUI window
+    try:
+        admin_gui = AdminFingerprintGUI()
+        
+        authenticated_role = None
+        
+        def run_auth():
+            nonlocal authenticated_role
+            attempts = 0
+            
+            while attempts < max_attempts:
+                attempts += 1
+                print(f"Admin attempt {attempts}/{max_attempts}")
+                
+                # Update GUI
+                admin_gui.root.after(0, lambda: admin_gui.update_status(f"👆 Place admin finger... (Attempt {attempts}/{max_attempts})", "#3498db"))
+                
+                # Wait for finger and process
+                finger_detected = False
+                for _ in range(100):  # 10 second timeout
+                    if finger.get_image() == adafruit_fingerprint.OK:
+                        finger_detected = True
+                        break
+                    time.sleep(0.1)
+                
+                if not finger_detected:
+                    if attempts < max_attempts:
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("⏰ Timeout! Try again...", "#e67e22"))
+                        time.sleep(2)
+                        continue
+                    else:
+                        admin_gui.root.after(0, admin_gui.show_failed)
+                        return
+                
+                # Process fingerprint
+                admin_gui.root.after(0, lambda: admin_gui.update_status("🔄 Processing...", "#f39c12"))
+                
+                if finger.image_2_tz(1) != adafruit_fingerprint.OK:
+                    if attempts < max_attempts:
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Processing failed! Try again...", "#e74c3c"))
+                        time.sleep(2)
+                        continue
+                    else:
+                        admin_gui.root.after(0, admin_gui.show_failed)
+                        return
+                
+                # Search for fingerprint match
+                admin_gui.root.after(0, lambda: admin_gui.update_status("🔍 Searching...", "#9b59b6"))
+                
+                if finger.finger_search() != adafruit_fingerprint.OK:
+                    if attempts < max_attempts:
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Not recognized! Try again...", "#e74c3c"))
+                        time.sleep(2)
+                        continue
+                    else:
+                        admin_gui.root.after(0, admin_gui.show_failed)
+                        return
+                
+                matched_slot = str(finger.finger_id)
+                
+                # SIMPLE SLOT-BASED ACCESS CONTROL
+                if matched_slot == "1":
+                    # Slot 1 = Super Admin (original admin)
+                    try:
+                        admin_db = load_admin_database()
+                        user_name = admin_db.get("1", {}).get("name", "Super Admin")
+                    except:
+                        user_name = "Super Admin"
+                    
+                    authenticated_role = "super_admin"
+                    print(f"✅ Super Admin authenticated: {user_name} (Slot 1)")
+                    
+                elif matched_slot == "2":
+                    # Slot 2 = Guard (hardcoded)
+                    try:
+                        fingerprint_db = load_fingerprint_database()
+                        user_name = fingerprint_db.get("2", {}).get("name", "Guard User")
+                    except:
+                        user_name = "Guard User"
+                    
+                    authenticated_role = "guard"
+                    print(f"✅ Guard authenticated: {user_name} (Slot 2)")
+                    
+                else:
+                    # All other slots = Check if they exist and are staff
+                    try:
+                        fingerprint_db = load_fingerprint_database()
+                        
+                        if matched_slot not in fingerprint_db:
+                            if attempts < max_attempts:
+                                admin_gui.root.after(0, lambda: admin_gui.update_status("❌ User not enrolled! Try again...", "#e74c3c"))
+                                time.sleep(2)
+                                continue
+                            else:
+                                admin_gui.root.after(0, admin_gui.show_failed)
+                                return
+                        
+                        finger_info = fingerprint_db[matched_slot]
+                        user_type = finger_info.get('user_type')
+                        user_name = finger_info.get('name', 'Unknown')
+                        
+                        # Only STAFF can access admin panel (not students)
+                        if user_type != 'STAFF':
+                            if attempts < max_attempts:
+                                admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Only staff can access admin! Try again...", "#e74c3c"))
+                                time.sleep(2)
+                                continue
+                            else:
+                                admin_gui.root.after(0, admin_gui.show_failed)
+                                return
+                        
+                        # All other staff slots get super admin access
+                        authenticated_role = "super_admin"
+                        print(f"✅ Staff Admin authenticated: {user_name} (Slot {matched_slot})")
+                        
+                    except Exception as e:
+                        print(f"❌ Database error: {e}")
+                        if attempts < max_attempts:
+                            admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Database error! Try again...", "#e74c3c"))
+                            time.sleep(2)
+                            continue
+                        else:
+                            admin_gui.root.after(0, admin_gui.show_failed)
+                            return
+                
+                print(f"🎯 Confidence: {finger.confidence}")
+                admin_gui.root.after(0, admin_gui.show_success)
+                return
+        
+        # Start auth
+        threading.Thread(target=run_auth, daemon=True).start()
+        admin_gui.root.wait_window()
+        
+        return authenticated_role
+        
+    except Exception as e:
+        print(f"❌ GUI Error: {e}")
+        return None
+        
 # =================== MAIN FUNCTION FOR TESTING ===================
 
 if __name__ == "__main__":
