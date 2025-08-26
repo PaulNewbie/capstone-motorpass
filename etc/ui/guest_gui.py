@@ -361,72 +361,66 @@ class GuestVerificationGUI:
             print(f"Error showing verification summary: {e}")
     
     def show_final_result(self, result):
-        """Show final verification result"""
+        """Show final verification result with improved design - matching student/staff styling"""
         try:
             self.verification_complete = True
             
-            # Create overlay
-            overlay = tk.Frame(self.root, bg='#333333')
-            overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
-            
-            # Result box
-            result_box = tk.Frame(overlay, bg='white', relief='solid', bd=3)
+            # Result box with yellow background and improved styling (same as student/staff)
+            result_box = tk.Frame(self.root, bg='#FFD700', relief='raised', bd=4)
             result_box.place(relx=0.5, rely=0.5, anchor='center')
             
-            # Content
-            content = tk.Frame(result_box, bg='white')
-            content.pack(padx=60, pady=40)
+            # Content with improved spacing (same as student/staff)
+            content = tk.Frame(result_box, bg='#FFD700')
+            content.pack(padx=50, pady=35)
             
             if result.get('verified', False):
                 # Success
-                icon_label = tk.Label(content, text="✅", font=("Arial", 60), bg='white')
-                icon_label.pack()
+                icon_label = tk.Label(content, text="✅", font=("Arial", 50), bg='#FFD700')
+                icon_label.pack(pady=(0, 15))
                 
-                title = tk.Label(content, text="VISITOR ACCESS GRANTED", 
-                               font=("Arial", 28, "bold"), fg="#28a745", bg='white')
-                title.pack(pady=(20, 10))
+                title = tk.Label(content, text="VERIFICATION SUCCESSFUL", 
+                               font=("Arial", 24, "bold"), fg="#2E7D32", bg='#FFD700')
+                title.pack(pady=(0, 15))
                 
+                # Format name (same logic as student/staff)
                 name = result.get('name', 'Guest')
+                if ',' in name:
+                    parts = name.split(',')
+                    if len(parts) >= 2:
+                        name = f"{parts[1].strip()} {parts[0].strip()}"
+                
                 welcome = tk.Label(content, text=f"Welcome, {name}!", 
-                                 font=("Arial", 18), fg="#333333", bg='white')
-                welcome.pack(pady=10)
+                                 font=("Arial", 18, "bold"), fg="#1B5E20", bg='#FFD700')
+                welcome.pack(pady=(0, 10))
                 
-                # Time status
-                time_action = result.get('time_action', 'IN')
-                time_color = "#28a745" if time_action == 'IN' else "#dc3545"
-                time_text = f"TIME {time_action} recorded at {result.get('timestamp', 'now')}"
+                # Time action (adapted for visitor - show timestamp)
+                timestamp = result.get('timestamp', 'N/A')
+                action_text = f"Visitor Access Granted: {timestamp}"
                 
-                time_label = tk.Label(content, text=time_text, 
-                                    font=("Arial", 16, "bold"), fg=time_color, bg='white')
-                time_label.pack(pady=10)
-                
-                # Office info if available
-                if 'office' in result:
-                    office_label = tk.Label(content, text=f"Visiting: {result['office']}", 
-                                          font=("Arial", 14), fg="#666666", bg='white')
-                    office_label.pack(pady=5)
+                action_label = tk.Label(content, text=action_text, 
+                                       font=("Arial", 14), fg="#424242", bg='#FFD700')
+                action_label.pack(pady=(0, 5))
                 
             else:
                 # Failure
-                icon_label = tk.Label(content, text="❌", font=("Arial", 60), bg='white')
-                icon_label.pack()
+                icon_label = tk.Label(content, text="❌", font=("Arial", 50), bg='#FFD700')
+                icon_label.pack(pady=(0, 15))
                 
-                title = tk.Label(content, text="ACCESS DENIED", 
-                               font=("Arial", 28, "bold"), fg="#dc3545", bg='white')
-                title.pack(pady=(20, 10))
+                title = tk.Label(content, text="VERIFICATION FAILED", 
+                               font=("Arial", 24, "bold"), fg="#C62828", bg='#FFD700')
+                title.pack(pady=(0, 15))
                 
-                reason = result.get('reason', 'Verification requirements not met')
-                reason_label = tk.Label(content, text=reason, 
-                                      font=("Arial", 14), fg="#666666", bg='white', 
-                                      wraplength=400, justify="center")
-                reason_label.pack(pady=10)
+                reason = tk.Label(content, text=result.get('reason', 'Unknown error'), 
+                                font=("Arial", 16), fg="#424242", bg='#FFD700', wraplength=400)
+                reason.pack(pady=(0, 10))
             
-            # Auto close after 3 seconds
-            self.root.after(3000, self.close)
+            # Auto close after 5 seconds (same as student/staff)
+            self.root.after(5000, self.close)
+            
         except Exception as e:
             print(f"Error showing final result: {e}")
             self.close()
-    
+        
     def update_status(self, updates):
         """Update status from verification thread"""
         try:

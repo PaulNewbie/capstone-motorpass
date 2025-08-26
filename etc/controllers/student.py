@@ -22,7 +22,6 @@ from datetime import datetime
 import tkinter as tk
 import tkinter.messagebox as msgbox
 
-
 def student_verification():
     """Main student/staff verification with GUI"""
     print("\n🎓👔 STUDENT/STAFF VERIFICATION")
