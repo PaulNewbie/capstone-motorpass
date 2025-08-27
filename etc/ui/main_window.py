@@ -675,7 +675,7 @@ class MotorPassGUI:
       
     # MODIFIED ONLY THIS METHOD - added restart logic
     def run_function(self, function, title):
-        """Hide GUI and run specified function"""
+        """Hide GUI and run specified function - UPDATE THIS FUNCTION"""
         try:
             self.root.withdraw()
             print(f"\n{'='*50}")
@@ -687,13 +687,14 @@ class MotorPassGUI:
             
             # Check if this needs restart (student or guest verification)
             if 'Student' in title or 'Guest' in title:
-                print("\n✅ Transaction completed!")
+                print("✅ Transaction completed!")
                 print("🔄 Quick restart for fresh camera...")
                 
                 # Set restart flag
                 self._restart_needed = True
                 
                 # Super fast restart - just 1 second
+                import time
                 time.sleep(1)
                 
                 # Restart the application
@@ -702,6 +703,18 @@ class MotorPassGUI:
             
             return result
             
+        except KeyboardInterrupt:
+            print(f"\n🛑 {title} interrupted by user")
+            # CHANGE: Handle Ctrl+C gracefully for verification processes
+            if 'Student' in title or 'Guest' in title:
+                print("🔄 Quick restart after interruption...")
+                self._restart_needed = True
+                import time
+                time.sleep(0.5)
+                self.restart_application()
+                return
+            # For other processes, just continue normally
+            
         except Exception as e:
             print(f"❌ Error in {title}: {str(e)}")
             
@@ -709,18 +722,26 @@ class MotorPassGUI:
             if 'Student' in title or 'Guest' in title:
                 print("🔄 Quick restart after transaction...")
                 self._restart_needed = True
+                import time
                 time.sleep(1)  # Fast restart on error too
                 self.restart_application()
                 return
             
             # For admin errors, show dialog and continue
-            messagebox.showerror("Error", f"An error occurred: {str(e)}")
+            try:
+                from tkinter import messagebox
+                messagebox.showerror("Error", f"An error occurred: {str(e)}")
+            except:
+                pass  # Skip messagebox if GUI issues
             
         finally:
             # Only show window again if not restarting
-            if not self._restart_needed:
-                self.root.deiconify()
-    
+            if not hasattr(self, '_restart_needed') or not self._restart_needed:
+                try:
+                    self.root.deiconify()
+                except:
+                    pass  # Skip if window destroyed
+
     # ADDED ONLY THESE TWO METHODS - restart functionality
     def restart_application(self):
         """Restart the entire application - FAST VERSION"""

@@ -28,6 +28,10 @@ except ImportError:
 firebase_db = None
 firebase_ready = False
 
+_last_connection_check = 0
+_last_connection_result = False
+_connection_cache_duration = 10 
+
 def init_firebase():
     """Initialize Firebase connection (call this once)"""
     global firebase_db, firebase_ready
@@ -65,24 +69,34 @@ def init_firebase():
         return False
 
 def is_online():
-    """Check if Firebase is available"""
-    global firebase_ready
+    """Check internet connection with caching - UPDATE OR ADD THIS FUNCTION"""
+    global _last_connection_check, _last_connection_result
     
-    if not firebase_ready:
-        firebase_ready = init_firebase()
+    import time
+    current_time = time.time()
     
-    if not firebase_ready:
-        return False
+    # Use cached result if recent
+    if current_time - _last_connection_check < _connection_cache_duration:
+        return _last_connection_result
     
     try:
-        # Quick connection test
-        test_doc = firebase_db.collection('_test').document('connection')
-        test_doc.set({'timestamp': firestore.SERVER_TIMESTAMP}, merge=True)
-        test_doc.delete()
-        return True
+        import socket
+        
+        # Try to connect to Google DNS
+        socket.setdefaulttimeout(3)  # Short timeout
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(("8.8.8.8", 53))
+        sock.close()
+        
+        # Cache the result
+        _last_connection_result = (result == 0)
+        _last_connection_check = current_time
+        
+        return _last_connection_result
         
     except Exception:
-        firebase_ready = False
+        _last_connection_result = False
+        _last_connection_check = current_time
         return False
 
 # =================== CLEAN SYNC FUNCTIONS ===================

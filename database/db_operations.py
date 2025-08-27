@@ -515,14 +515,14 @@ def create_guest_time_data(guest_info):
     }
 
 def process_guest_time_in(guest_info):
-    """FIXED: Your updated function with safe Firebase sync"""
+    """FIXED: No double sync for guests"""
     try:
         guest_time_data = create_guest_time_data(guest_info)
         
-        # Your existing local database save
+        # This will NOT sync (because user_id starts with 'GUEST_')
         if record_time_in(guest_time_data):
             
-            # FIXED: Safe Firebase sync for time entry
+            # Manual sync for guests only
             try:
                 user_id = f"GUEST_{guest_info['plate_number']}"
                 sync_time_to_firebase(user_id, guest_info['name'], 'GUEST', 'IN')
@@ -551,16 +551,16 @@ def process_guest_time_in(guest_info):
             'message': f"❌ Error: {e}",
             'color': "🔴"
         }
-            
+                        
 def process_guest_time_out(guest_info):
-    """FIXED: Your updated function with safe Firebase sync"""
+    """FIXED: No double sync for guests"""
     try:
         guest_time_data = create_guest_time_data(guest_info)
         
-        # Your existing local database save
+        # This will NOT sync (because user_id starts with 'GUEST_')
         if record_time_out(guest_time_data):
             
-            # FIXED: Safe Firebase sync for time entry
+            # Manual sync for guests only
             try:
                 user_id = f"GUEST_{guest_info['plate_number']}"
                 sync_time_to_firebase(user_id, guest_info['name'], 'GUEST', 'OUT')
@@ -589,7 +589,7 @@ def process_guest_time_out(guest_info):
             'message': f"❌ Error: {e}",
             'color': "🔴"
         }
-
+            
 # =================== TIME TRACKING OPERATIONS ===================
 
 def get_student_time_status(user_id: str) -> Optional[str]:
@@ -609,7 +609,7 @@ def get_student_time_status(user_id: str) -> Optional[str]:
         return 'OUT'
 
 def record_time_in(user_info):
-    """FIXED: Your updated function with safe Firebase sync"""
+    """FIXED: Record TIME IN with conditional sync"""
     try:
         conn = sqlite3.connect(MOTORPASS_DB)
         cursor = conn.cursor()
@@ -620,7 +620,7 @@ def record_time_in(user_info):
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
-        # Your existing local database save
+        # Local database save
         cursor.execute('''
             INSERT INTO time_tracking (user_id, user_name, user_type, action, date, time)
             VALUES (?, ?, ?, 'IN', ?, ?)
@@ -634,21 +634,24 @@ def record_time_in(user_info):
         conn.commit()
         conn.close()
         
-        # FIXED: Safe Firebase sync
-        try:
-            sync_time_to_firebase(user_id, user_name, user_type, 'IN')
-            print("🔥 Time IN synced to Firebase")
-        except Exception as e:
-            print(f"⚠️  Firebase sync failed: {e}")
+        # RESTORED: Firebase sync for student/staff
+        # Skip sync only if this is a guest (to avoid double sync)
+        if not user_id.startswith('GUEST_'):
+            try:
+                sync_time_to_firebase(user_id, user_name, user_type, 'IN')
+                print("🔥 Time IN synced to Firebase")
+            except Exception as e:
+                print(f"⚠️  Firebase sync failed: {e}")
         
+        print(f"✅ Time recorded: {user_name} - IN")
         return True
         
     except Exception as e:
         print(f"❌ Error recording time in: {e}")
         return False
-        
+           
 def record_time_out(user_info: Dict) -> bool:
-    """FIXED: Record TIME OUT for any user with safe Firebase sync"""
+    """FIXED: Record TIME OUT with conditional sync"""
     try:
         conn = sqlite3.connect(MOTORPASS_DB)
         cursor = conn.cursor()
@@ -659,7 +662,7 @@ def record_time_out(user_info: Dict) -> bool:
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
-        # Record in time_tracking
+        # Local database save
         cursor.execute('''
             INSERT INTO time_tracking (user_id, user_name, user_type, action, date, time)
             VALUES (?, ?, ?, 'OUT', ?, ?)
@@ -674,19 +677,22 @@ def record_time_out(user_info: Dict) -> bool:
         conn.commit()
         conn.close()
         
-        # FIXED: Safe Firebase sync
-        try:
-            sync_time_to_firebase(user_id, user_name, user_type, 'OUT')
-            print("🔥 Time OUT synced to Firebase")
-        except Exception as e:
-            print(f"⚠️  Firebase sync failed: {e}")
+        # RESTORED: Firebase sync for student/staff
+        # Skip sync only if this is a guest (to avoid double sync)
+        if not user_id.startswith('GUEST_'):
+            try:
+                sync_time_to_firebase(user_id, user_name, user_type, 'OUT')
+                print("🔥 Time OUT synced to Firebase")
+            except Exception as e:
+                print(f"⚠️  Firebase sync failed: {e}")
         
+        print(f"✅ Time recorded: {user_name} - OUT")
         return True
         
     except sqlite3.Error as e:
         print(f"❌ Error recording time out: {e}")
         return False
-
+             
 def record_time_attendance(user_info: Dict) -> str:
     """Auto record time attendance based on current status"""
     user_id = user_info.get('unified_id', user_info.get('student_id', ''))

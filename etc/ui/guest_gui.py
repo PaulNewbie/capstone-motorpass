@@ -444,25 +444,102 @@ class GuestVerificationGUI:
         """Start verification in separate thread"""
         self.current_step.set("🚀 Initializing visitor verification...")
         
-        # Run verification in thread
-        thread = threading.Thread(target=self.run_verification_thread, daemon=True)
-        thread.start()
+        # Run verification in thread - STORE THE REFERENCE
+        self.verification_thread = threading.Thread(target=self.run_verification_thread, daemon=True)
+        self.verification_thread.start()
     
     def run_verification_thread(self):
-        """Run verification and update GUI"""
+        """Run verification and update GUI - UPDATE THIS FUNCTION"""
         try:
+            if not hasattr(self, 'is_running'):
+                self.is_running = True
+                
+            if not self.is_running:
+                return
+                
             # Call the verification function with callback
             result = self.verification_function(self.update_status_callback)
             
-            # Show final result
-            self.root.after(0, lambda: self.update_status({'final_result': result}))
-            
+            # CHANGE: Use queue instead of direct GUI updates
+            if hasattr(self, 'result_queue') and self.is_running:
+                self.result_queue.put(('success', result))
+            else:
+                # Fallback to old method if queue not available
+                if self.root and self.is_running:
+                    try:
+                        self.root.after(0, lambda: self.update_status({'final_result': result}))
+                    except RuntimeError as e:
+                        print(f"⚠️ GUI update skipped: {e}")
+                        
         except Exception as e:
+            print(f"❌ Verification thread error: {e}")
             error_result = {
                 'verified': False,
                 'reason': f'Error: {str(e)}'
             }
-            self.root.after(0, lambda: self.update_status({'final_result': error_result}))
+            
+            # CHANGE: Use queue for errors too
+            if hasattr(self, 'result_queue') and self.is_running:
+                self.result_queue.put(('error', error_result))
+            else:
+                # Fallback to old method
+                if self.root and self.is_running:
+                    try:
+                        self.root.after(0, lambda: self.update_status({'final_result': error_result}))
+                    except RuntimeError as e:
+                        print(f"⚠️ Error GUI update skipped: {e}")
+                 
+    def check_verification_result(self):
+        """ADD this new function"""
+        try:
+            if not hasattr(self, 'is_running') or not self.is_running:
+                return
+                
+            # Check for results from verification thread
+            try:
+                while not self.result_queue.empty():
+                    result_type, data = self.result_queue.get_nowait()
+                    
+                    if result_type == 'success':
+                        self.update_status({'final_result': data})
+                        # Auto-close after 3 seconds
+                        if self.root:
+                            self.root.after(3000, self.safe_close)
+                    elif result_type == 'error':
+                        self.update_status({'final_result': data})
+                        # Auto-close after 5 seconds for errors
+                        if self.root:
+                            self.root.after(5000, self.safe_close)
+                            
+                    return  # Process one result at a time
+            except:
+                pass  # No results yet
+            
+            # Schedule next check if still running
+            if self.is_running and self.root:
+                self.root.after(100, self.check_verification_result)
+                
+        except Exception as e:
+            print(f"❌ Result check error: {e}")
+
+    def safe_close(self):
+        """ADD this new function"""
+        try:
+            print("🏁 Closing verification GUI...")
+            if hasattr(self, 'is_running'):
+                self.is_running = False
+            
+            # Wait for verification thread to finish
+            if hasattr(self, 'verification_thread') and self.verification_thread and self.verification_thread.is_alive():
+                self.verification_thread.join(timeout=1.0)
+            
+            # Destroy GUI
+            if hasattr(self, 'root') and self.root:
+                self.root.quit()
+                self.root.destroy()
+                
+        except Exception as e:
+            print(f"❌ Close error: {e}")
     
     def update_status_callback(self, status_dict):
         """Callback for status updates"""
@@ -472,29 +549,57 @@ class GuestVerificationGUI:
             print(f"Error in callback: {e}")
     
     def close(self):
-        """Close the GUI"""
+        """Close the GUI - UPDATE THIS FUNCTION"""
         try:
+            # ADD: Set running flag to false first
+            if hasattr(self, 'is_running'):
+                self.is_running = False
+                
             self.verification_complete = True
             
-            if hasattr(self, '_update_time'):
+            # Wait for verification thread to finish
+            if hasattr(self, 'verification_thread') and self.verification_thread and self.verification_thread.is_alive():
+                self.verification_thread.join(timeout=1.0)
+            
+            if hasattr(self, '_update_timer'):
                 self.root.after_cancel(self._update_timer)
-				
+                
             self.root.quit()
             self.root.destroy()
         except Exception as e:
             print(f"Error closing GUI: {e}")
     
     def run(self):
-        """Run the GUI"""
+        """Main GUI loop - UPDATE THIS FUNCTION"""
         try:
+            # ADD: Initialize thread-safe queue and running flag
+            import queue
+            self.result_queue = queue.Queue()
+            self.is_running = True
+            
+            # ADD: Start result checker
+            self.check_verification_result()
+            
+            # Handle window close
+            self.root.protocol("WM_DELETE_WINDOW", self.safe_close)
+            
             # Bind escape key
-            self.root.bind('<Escape>', lambda e: self.close())
+            self.root.bind('<Escape>', lambda e: self.safe_close())
             
+            # REMOVE THE DUPLICATE: Don't create another thread here
+            # The start_verification() already creates a thread
             # Start verification after GUI loads
-            self.root.after(1000, self.start_verification)
+            self.root.after(1000, self.start_verification)  # This already creates the thread
             
-            # Start main loop
+            # Start GUI loop
             self.root.mainloop()
+            
+        except KeyboardInterrupt:
+            print("\n🛑 Verification interrupted by user")
+            self.safe_close()
         except Exception as e:
-            print(f"Error running GUI: {e}")
-            self.close()
+            print(f"❌ GUI error: {e}")
+            self.safe_close()
+        finally:
+            if hasattr(self, 'is_running'):
+                self.is_running = False

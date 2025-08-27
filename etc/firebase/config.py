@@ -23,10 +23,14 @@ COLLECTIONS = {
 # =================== SYNC SETTINGS ===================
 
 # How often to check for internet connection (seconds)
-CONNECTION_CHECK_INTERVAL = 30
+CONNECTION_CHECK_INTERVAL = 60
 
 # Maximum items to keep in offline queue  
-MAX_QUEUE_SIZE = 1000
+MAX_QUEUE_SIZE = 500
 
 # File to store offline sync queue
 SYNC_QUEUE_FILE = "json_folder/firebase_sync_queue.json"
+
+BATCH_SIZE = 5  # Small batches for slow connections
+BATCH_TIMEOUT = 10  # Wait longer before sending partial batches
+CONNECTION_TIMEOUT = 5  # Short timeout for quick failure detection
