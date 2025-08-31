@@ -1,4 +1,4 @@
-# main.py - MotorPass GUI Application with proper cleanup
+# main.py - Simple fix with cleanup calls added
 import os
 import sys
 import sqlite3
@@ -23,16 +23,10 @@ from etc.services.led_control import (
 from etc.services.rpi_camera import force_camera_cleanup
 from database.db_operations import initialize_all_databases
 
-# Global flag to track if restart is needed
-RESTART_AFTER_TRANSACTION = False
-
 def initialize_system():
     """Initialize system components"""
     print(f"🚗 {SYSTEM_NAME} System Initialization")
     print("="*50)
-    
-    # Smart cleanup at startup - will only clean if needed
-    force_camera_cleanup()
     
     # Initialize LED system
     led_ok = init_led_system(red_pin=18, green_pin=16)
@@ -51,131 +45,94 @@ def initialize_system():
 def cleanup_system():
     """Cleanup system resources"""
     try:
-        print("\n🧹 Cleaning up system resources...")
         cleanup_led_system()
         force_camera_cleanup()
-        print("✅ Cleanup complete")
-    except Exception as e:
-        print(f"⚠️ Cleanup error: {e}")
+    except:
+        pass
 
 def restart_application():
     """Restart the entire application"""
-    print("\n🔄 Restarting application for fresh camera state...")
+    print("\n🔄 Restarting...")
     
-    # Clean up current resources
+    # Clean up and restart
     cleanup_system()
+    time.sleep(0.5)
     
-    # Small delay to ensure cleanup
-    time.sleep(1)
-    
-    # Get the current script path
     script_path = os.path.abspath(__file__)
-    python_executable = sys.executable
-    
-    # Start new instance
-    print("🚀 Starting new instance...")
-    subprocess.Popen([python_executable, script_path])
-    
-    # Exit current instance
+    subprocess.Popen([sys.executable, script_path])
     sys.exit(0)
 
-def student_verification_wrapper():
-    """Wrapper for student verification with auto-restart"""
-    global RESTART_AFTER_TRANSACTION
-    
+# Simple wrapper functions - minimal cleanup
+def student_wrapper(main_window=None):
+    """Simple wrapper - just hide window, run process, restart"""
     try:
-        # Run original student verification
-        result = student_verification()
+        if main_window:
+            main_window.withdraw()  # Hide main window
         
-        # Set restart flag
-        RESTART_AFTER_TRANSACTION = True
+        result = student_verification()  # Run your original function
         
         return result
-        
-    except Exception as e:
-        print(f"❌ Student verification error: {e}")
-        RESTART_AFTER_TRANSACTION = True
-        raise
+    finally:
+        restart_application()  # Always restart after
 
-def guest_verification_wrapper():
-    """Wrapper for guest verification with auto-restart"""
-    global RESTART_AFTER_TRANSACTION
-    
+def guest_wrapper(main_window=None):
+    """Simple wrapper - just hide window, run process, restart"""
     try:
-        # Run original guest verification
-        result = guest_verification()
+        if main_window:
+            main_window.withdraw()  # Hide main window
         
-        # Set restart flag
-        RESTART_AFTER_TRANSACTION = True
+        result = guest_verification()  # Run your original function
         
         return result
+    finally:
+        restart_application()  # Always restart after
+
+def admin_wrapper(main_window=None):
+    """Simple wrapper - just hide window, run process, restart"""
+    try:
+        if main_window:
+            main_window.withdraw()  # Hide main window
         
+        result = admin_panel()  # Run your original function
+        
+        return result
+    finally:
+        restart_application()  # Always restart after
+
+def main():
+    """Main function - unchanged except using wrappers"""
+    try:
+        print(f"\n{'='*60}")
+        print(f"🚗 {SYSTEM_NAME} v{SYSTEM_VERSION}")
+        print(f"{'='*60}")
+        
+        # Initialize system
+        if not initialize_system():
+            print("❌ System initialization failed!")
+            return False
+        
+        # Create main GUI with wrapper functions (instead of original functions)
+        main_gui = MotorPassGUI(
+            system_name=SYSTEM_NAME,
+            system_version=SYSTEM_VERSION,
+            student_function=student_wrapper,  # Use wrapper
+            guest_function=guest_wrapper,      # Use wrapper
+            admin_function=admin_wrapper       # Use wrapper
+        )
+        
+        # Run main GUI
+        main_gui.run()
+        
+    except KeyboardInterrupt:
+        print("\n⚠️ System interrupted by user")
+        cleanup_system()
+        return False
     except Exception as e:
-        print(f"❌ Guest verification error: {e}")
-        RESTART_AFTER_TRANSACTION = True
-        raise
-
-def admin_panel_wrapper(main_window=None):
-    """Wrapper for admin panel - no restart needed"""
-    return admin_panel(main_window=main_window)
-
-def main_loop():
-    """Main application loop with restart logic"""
-    global RESTART_AFTER_TRANSACTION
-    
-    while True:
-        RESTART_AFTER_TRANSACTION = False
-        
-        try:
-            # Create and run GUI using the separate UI class
-            app = MotorPassGUI(
-                system_name=SYSTEM_NAME,
-                system_version=SYSTEM_VERSION,
-                admin_function=admin_panel_wrapper,
-                student_function=student_verification_wrapper,
-                guest_function=guest_verification_wrapper
-            )
-            
-            # Run the GUI
-            app.run()
-            
-            # Check if restart is needed
-            if RESTART_AFTER_TRANSACTION:
-                print("\n🔄 Transaction completed - restarting for fresh camera state...")
-                restart_application()
-            else:
-                # Normal exit
-                break
-                
-        except KeyboardInterrupt:
-            print("\n\n⚠️ System interrupted by user")
-            break
-        except Exception as e:
-            print(f"❌ GUI Error: {e}")
-            import traceback
-            traceback.print_exc()
-            
-            # Check if restart is needed even after error
-            if RESTART_AFTER_TRANSACTION:
-                print("\n🔄 Error occurred after transaction - restarting...")
-                restart_application()
-            else:
-                break
+        print(f"\n❌ System error: {e}")
+        cleanup_system()
+        return False
+    finally:
+        cleanup_system()
 
 if __name__ == "__main__":
-    print(f"🚗 {SYSTEM_NAME} v{SYSTEM_VERSION}")
-    print("="*50)
-    
-    # Initialize system components
-    if initialize_system():
-        print("🖥️ Starting GUI interface...")
-        
-        try:
-            # Start main loop with restart logic
-            main_loop()
-            
-        finally:
-            cleanup_system()
-    else:
-        print("❌ Cannot start - check system configuration")
-        input("Press Enter to exit...")
+    main()
