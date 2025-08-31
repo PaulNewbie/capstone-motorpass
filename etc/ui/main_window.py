@@ -1,3 +1,4 @@
+# main_window.py
 import tkinter as tk
 from tkinter import messagebox
 import os
@@ -32,25 +33,67 @@ class MotorPassGUI:
         
         self.root = tk.Tk()
         self.root.title(f"{system_name} System v{system_version}")
-        self.root.geometry("1366x768")  # Full HD resolution
+        
+        # Responsive window sizing - auto-detect screen size and aspect ratio
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
+        
+        # Calculate aspect ratio to determine display type
+        aspect_ratio = self.screen_width / self.screen_height
+        self.is_square_display = abs(aspect_ratio - 1.0) < 0.2  # Within 20% of square
+        self.is_wide_display = aspect_ratio > 1.5  # Wider than 3:2
+        
+        # Set base size for calculations
+        if self.is_square_display:
+            self.display_size = min(self.screen_width, self.screen_height)
+        else:
+            self.display_size = min(self.screen_width, self.screen_height)
+            
+        self.root.geometry(f"{self.screen_width}x{self.screen_height}")
         self.root.resizable(False, False)
         self.root.configure(bg='black')
         
-        # Make window fullscreen-like (cross-platform)
+        # Make window fullscreen and hide taskbar
         try:
             # Try Windows method first
             self.root.state('zoomed')
+            # Hide taskbar by making window truly fullscreen
+            self.root.attributes('-fullscreen', True)
         except:
             # Fallback for other platforms
-            self.root.attributes('-zoomed', True)
+            try:
+                self.root.attributes('-zoomed', True)
+                self.root.attributes('-fullscreen', True)
+            except:
+                # Final fallback - just maximize
+                self.root.state('normal')
+                self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
         
-        # Remove topmost for better usability
-        # self.root.attributes('-topmost', True)
+        # Bind Escape key to exit fullscreen (for testing/admin access)
+        self.root.bind('<Escape>', self.toggle_fullscreen)
+        # Also bind F11 for fullscreen toggle
+        self.root.bind('<F11>', self.toggle_fullscreen)
         
         self.setup_window()
         self.start_clock()
         self.start_time_in_counter()
         
+    def toggle_fullscreen(self, event=None):
+        """Toggle fullscreen mode - useful for admin access or testing"""
+        try:
+            current_state = self.root.attributes('-fullscreen')
+            self.root.attributes('-fullscreen', not current_state)
+            
+            if current_state:
+                # Exiting fullscreen
+                print("Exited fullscreen mode (Taskbar visible)")
+            else:
+                # Entering fullscreen  
+                print("Entered fullscreen mode (Taskbar hidden)")
+                
+        except Exception as e:
+            print(f"Error toggling fullscreen: {e}")
+
     def setup_window(self):
         """Setup main window"""
         self.center_window()
@@ -65,7 +108,7 @@ class MotorPassGUI:
         self.root.update_idletasks()
         
     def setup_background(self):
-        """Setup fullscreen background image"""
+        """Setup responsive fullscreen background image"""
         # Try to load the background image
         background_paths = [
             "assets/background.jpg",
@@ -78,17 +121,28 @@ class MotorPassGUI:
         for bg_path in background_paths:
             if os.path.exists(bg_path):
                 try:
-                    # Get screen dimensions
-                    screen_width = self.root.winfo_screenwidth()
-                    screen_height = self.root.winfo_screenheight()
-                    
                     image = Image.open(bg_path)
-                    # Resize to fill screen while maintaining aspect ratio
-                    image = image.resize((screen_width, screen_height), Image.Resampling.LANCZOS)
+                    # Resize to fill screen completely while maintaining aspect ratio
+                    image_ratio = image.width / image.height
+                    screen_ratio = self.screen_width / self.screen_height
+                    
+                    if image_ratio > screen_ratio:
+                        # Image is wider than screen
+                        new_height = self.screen_height
+                        new_width = int(new_height * image_ratio)
+                    else:
+                        # Image is taller than screen
+                        new_width = self.screen_width
+                        new_height = int(new_width / image_ratio)
+                    
+                    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
                     self.background_image = ImageTk.PhotoImage(image)
                     
+                    # Create background label that fills entire screen
                     background_label = tk.Label(self.root, image=self.background_image)
-                    background_label.place(x=0, y=0, relwidth=1, relheight=1)
+                    background_label.place(x=(self.screen_width - new_width)//2, 
+                                         y=(self.screen_height - new_height)//2,
+                                         width=new_width, height=new_height)
                     background_loaded = True
                     break
                 except Exception as e:
@@ -100,35 +154,35 @@ class MotorPassGUI:
             self.create_gradient_background()
     
     def create_gradient_background(self):
-        """Create gradient background as fallback"""
+        """Create responsive gradient background as fallback"""
         canvas = tk.Canvas(self.root, highlightthickness=0)
-        canvas.place(x=0, y=0, relwidth=1, relheight=1)
+        canvas.place(x=0, y=0, width=self.screen_width, height=self.screen_height)
         
-        screen_height = self.root.winfo_screenheight()
-        screen_width = self.root.winfo_screenwidth()
-        
-        for i in range(screen_height):
+        for i in range(self.screen_height):
             # Create a brown to darker brown gradient
-            intensity = int(139 - (i / screen_height) * 50)  # From 139 to 89
+            intensity = int(139 - (i / self.screen_height) * 50)  # From 139 to 89
             color = f"#{intensity:02x}{int(intensity*0.6):02x}{int(intensity*0.4):02x}"
-            canvas.create_line(0, i, screen_width, i, fill=color)
+            canvas.create_line(0, i, self.screen_width, i, fill=color)
     
     def create_header(self):
-        """Create modern header with logo and title"""
+        """Create responsive header with logo and title"""
+        # Calculate responsive header height based on screen size
+        header_height = max(100, int(self.screen_height * 0.12))
+        
         # Header overlay with transparency effect
-        header_frame = tk.Frame(self.root, bg='#46230a', height=120)
+        header_frame = tk.Frame(self.root, bg='#46230a', height=header_height)
         header_frame.pack(fill="x", padx=0, pady=0)
         header_frame.pack_propagate(False)
-        
-        # Add some transparency effect with a subtle border
-        header_frame.configure(relief='flat', bd=0)
         
         # Logo and title container
         content_frame = tk.Frame(header_frame, bg='#46230a')
         content_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
+        # Calculate responsive logo size
+        logo_size = max(60, int(header_height * 0.7))
+        
         # Logo section
-        logo_frame = tk.Frame(content_frame, bg='#46230a', width= 95, height=85)
+        logo_frame = tk.Frame(content_frame, bg='#46230a', width=logo_size, height=logo_size)
         logo_frame.pack(side="left", padx=(0, 15), pady=5)
         logo_frame.pack_propagate(False)
         
@@ -140,7 +194,7 @@ class MotorPassGUI:
             if os.path.exists(logo_path):
                 try:
                     logo_img = Image.open(logo_path)
-                    logo_img = logo_img.resize((95, 95), Image.Resampling.LANCZOS)
+                    logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
                     self.logo_image = ImageTk.PhotoImage(logo_img)
                     logo_label = tk.Label(logo_frame, image=self.logo_image, bg='#46230a')
                     logo_label.pack(expand=True)
@@ -151,101 +205,321 @@ class MotorPassGUI:
                     continue
         
         if not logo_loaded:
-            # Fallback logo with modern styling
-            logo_bg = tk.Frame(logo_frame, bg='#DAA520', width=80, height=80)
+            # Fallback logo with responsive sizing
+            fallback_size = int(logo_size * 0.8)
+            logo_bg = tk.Frame(logo_frame, bg='#DAA520', width=fallback_size, height=fallback_size)
             logo_bg.pack(expand=True)
             logo_bg.pack_propagate(False)
-            logo_text = tk.Label(logo_bg, text="🚗", font=("Arial", 40), bg='#DAA520', fg='#2F1B14')
+            logo_text = tk.Label(logo_bg, text="🚗", font=("Arial", int(logo_size*0.5)), bg='#DAA520', fg='#2F1B14')
             logo_text.place(relx=0.5, rely=0.5, anchor="center")
         
         # Title section
         title_frame = tk.Frame(content_frame, bg='#46230a')
         title_frame.pack(side="left", fill="y", padx=(15, 0))
         
-        # Main title with modern typography
+        # Responsive font sizes
+        title_font_size = max(20, int(self.screen_width / 45))
+        subtitle_font_size = max(9, int(self.screen_width / 120))
+        
+        # Main title with responsive typography
         title_label = tk.Label(title_frame, text=self.system_name, 
-                              font=("Arial", 30, "bold"), fg="#DAA520", bg='#46230a')
+                              font=("Arial", title_font_size, "bold"), fg="#DAA520", bg='#46230a')
         title_label.pack(anchor="w", pady=(10, 0))
         
         # Subtitle
         subtitle_label = tk.Label(title_frame, text=f"**We secure the safeness of your motorcycle in side our campus**", 
-                                 font=("Arial", 11), fg="#c7971d", bg='#46230a')
+                                 font=("Arial", subtitle_font_size), fg="#c7971d", bg='#46230a')
         subtitle_label.pack(anchor="w")
 
-
-    
     def create_clock(self):
-        """Create digital clock display in top right corner"""
-        # Clock container in top right
+        """Create responsive digital clock display in top right corner"""
+        # Calculate responsive clock dimensions
+        clock_width = max(180, int(self.screen_width * 0.15))
+        clock_height = max(70, int(self.screen_height * 0.08))
+        
+        # Clock container in top right with responsive positioning
         self.clock_frame = tk.Frame(self.root, bg='#46230a', bd=2, relief='solid')
-        self.clock_frame.place(relx=0.98, rely=0.02, width=220, height=80, anchor='ne')
+        margin = max(10, int(self.screen_width * 0.01))
+        self.clock_frame.place(x=self.screen_width - clock_width - margin, 
+                              y=margin, 
+                              width=clock_width, height=clock_height)
+        
+        # Responsive font sizes
+        time_font_size = max(16, int(self.screen_width / 70))
+        date_font_size = max(8, int(self.screen_width / 140))
         
         # Time display
         self.time_label = tk.Label(self.clock_frame, text="00:00:00", 
-                                  font=("Arial", 20, "bold"), fg="#DAA520", bg='#46230a')
+                                  font=("Arial", time_font_size, "bold"), fg="#DAA520", bg='#46230a')
         self.time_label.pack(pady=(5, 0))
         
         # Date display
         self.date_label = tk.Label(self.clock_frame, text="Monday, January 01, 2025", 
-                                  font=("Arial", 10), fg="#FFFFFF", bg='#46230a')
+                                  font=("Arial", date_font_size), fg="#FFFFFF", bg='#46230a')
         self.date_label.pack()
     
     def create_time_in_counter(self):
-        """Create unified counter display with VIP and regular counts in one box"""
-        # Single unified counter box
+        """Create responsive unified counter display with VIP and regular counters"""
+        # Calculate responsive counter dimensions
+        counter_width = max(150, int(self.screen_width * 0.12))
+        counter_height = max(120, int(self.screen_height * 0.15))
+        
+        # Counter container in bottom left with responsive positioning (moved up)
+        margin = max(10, int(self.screen_width * 0.01))
+        bottom_margin = max(30, int(self.screen_height * 0.04))  # Increased bottom margin
         self.counter_frame = tk.Frame(self.root, bg='#46230a', bd=2, relief='solid')
-        self.counter_frame.place(relx=0.98, rely=0.98, width=320, height=85, anchor='se')
+        self.counter_frame.place(x=margin, 
+                                y=self.screen_height - counter_height - bottom_margin, 
+                                width=counter_width, height=counter_height)
         
-        # Title at the top
-        counter_title = tk.Label(self.counter_frame, text="Currently Inside", 
-                               font=("Arial", 12, "bold"), fg="#FFFFFF", bg='#46230a')
-        counter_title.pack(pady=(5, 0))
+        # Responsive font sizes
+        title_font_size = max(10, int(self.screen_width / 120))
+        count_font_size = max(18, int(self.screen_width / 60))
+        label_font_size = max(8, int(self.screen_width / 150))
         
-        # Main content area for both counters
-        content_frame = tk.Frame(self.counter_frame, bg='#46230a')
-        content_frame.pack(fill="both", expand=True, padx=10, pady=(0, 5))
+        # Regular counter
+        tk.Label(self.counter_frame, text="CURRENT INSIDE", 
+                font=("Arial", title_font_size, "bold"), fg="#DAA520", bg='#46230a').pack(pady=(5, 0))
         
-        # VIP section (left side)
-        vip_frame = tk.Frame(content_frame, bg='#46230a')
-        vip_frame.pack(side="left", fill="both", expand=True)
+        self.count_label = tk.Label(self.counter_frame, text="0", 
+                                   font=("Arial", count_font_size, "bold"), fg="#FFFFFF", bg='#46230a')
+        self.count_label.pack()
         
-        vip_label = tk.Label(vip_frame, text="🌟 VIP", 
-                            font=("Arial", 9), fg="#F1C40F", bg='#46230a')
-        vip_label.pack()
+        tk.Label(self.counter_frame, text="Students/Staff", 
+                font=("Arial", label_font_size), fg="#c7971d", bg='#46230a').pack()
         
-        self.vip_count_label = tk.Label(vip_frame, text="0", 
-                                       font=("Arial", 20, "bold"), fg="#DAA520", bg='#46230a')
+        # Separator
+        separator = tk.Frame(self.counter_frame, bg='#DAA520', height=1)
+        separator.pack(fill="x", padx=10, pady=2)
+        
+        # VIP counter
+        self.vip_count_label = tk.Label(self.counter_frame, text="0", 
+                                       font=("Arial", int(count_font_size*0.8), "bold"), fg="#FF4444", bg='#46230a')
         self.vip_count_label.pack()
         
-        # Separator line
-        separator = tk.Frame(content_frame, bg='#DAA520', width=1)
-        separator.pack(side="left", fill="y", padx=8)
-        
-        # Regular section (right side)
-        regular_frame = tk.Frame(content_frame, bg='#46230a')
-        regular_frame.pack(side="left", fill="both", expand=True)
-        
-        regular_label = tk.Label(regular_frame, text="👥 ALL", 
-                               font=("Arial", 9), fg="#F1C40F", bg='#46230a')
-        regular_label.pack()
-        
-        self.count_label = tk.Label(regular_frame, text="0", 
-                                  font=("Arial", 20, "bold"), fg="#DAA520", bg='#46230a')
-        self.count_label.pack()
+        tk.Label(self.counter_frame, text="VIPs Inside", 
+                font=("Arial", label_font_size), fg="#c7971d", bg='#46230a').pack()
 
+    def create_selection_interface(self):
+        """Create responsive centered selection interface that adapts to screen aspect ratio"""
+        # Calculate responsive overlay dimensions based on screen type
+        if self.is_square_display:
+            # Square display (like your touch screen)
+            overlay_width = max(450, int(self.screen_width * 0.35))
+            overlay_height = max(400, int(self.screen_height * 0.45))
+        
+        elif self.is_wide_display:
+            # Wide display (16:9, 21:9, etc.)
+            overlay_width = max(450, int(self.screen_width * 0.35))
+            overlay_height = max(400, int(self.screen_height * 0.45))
+        
+        else:
+            # Standard display - balanced approach (wider and taller)
+            overlay_width = max(450, int(self.screen_width * 0.35))
+            overlay_height = max(400, int(self.screen_height * 0.45))
+        
+        
+        # Ensure minimum size for touch interaction
+        overlay_width = max(overlay_width, 500)
+        overlay_height = max(overlay_height, 450)
+        
+        # Create shadow effect (multiple layers for depth)
+        shadow_offsets = [(6, 6, '#404040'), (4, 4, '#505050'), (2, 2, '#606060')]
+        for offset_x, offset_y, shadow_color in shadow_offsets:
+            shadow_frame = tk.Frame(self.root, bg=shadow_color)
+            shadow_frame.place(relx=0.5, rely=0.5,  # Moved up from 0.5 to 0.47
+                             width=overlay_width, height=overlay_height, 
+                             anchor='center', x=offset_x, y=offset_y)
+        
+        # Main container with glass morphism effect - MOVED SLIGHTLY UP
+        self.main_overlay = tk.Frame(self.root, bg='#2c1810', bd=0, relief='flat')
+        self.main_overlay.place(relx=0.5, rely=0.5,  # Moved up from 0.5 to 0.47
+                               width=overlay_width, height=overlay_height, 
+                               anchor='center')
+        
+        # Add border effect
+        border_frame = tk.Frame(self.main_overlay, bg='#D4AF37', height=3)
+        border_frame.pack(fill="x", side="top")
+        
+        # Inner container with padding
+        inner_container = tk.Frame(self.main_overlay, bg='#2c1810')
+        inner_container.pack(fill="both", expand=True, padx=3, pady=3)
+        
+        # Calculate responsive font sizes based on display type
+        if self.is_square_display:
+            # Square display - original sizing
+            title_font_size = max(18, int(self.screen_width / 60))
+            subtitle_font_size = max(8, int(self.screen_width / 140))
+            button_font_size = max(12, int(self.screen_width / 90))
+        elif self.is_wide_display:
+            # Wide display - use height for better proportion
+            title_font_size = max(20, int(self.screen_height / 35))
+            subtitle_font_size = max(9, int(self.screen_height / 80))
+            button_font_size = max(13, int(self.screen_height / 55))
+        else:
+            # Standard display - balanced approach
+            base_size = min(self.screen_width, self.screen_height)
+            title_font_size = max(19, int(base_size / 50))
+            subtitle_font_size = max(9, int(base_size / 90))
+            button_font_size = max(13, int(base_size / 70))
+        
+        # Title section with enhanced styling
+        title_height = max(80, int(overlay_height * 0.2))
+        title_container = tk.Frame(inner_container, bg='#3d2317', height=title_height)
+        title_container.pack(fill="x", padx=15, pady=(15, 0))
+        title_container.pack_propagate(False)
+        
+        # Decorative line above title
+        deco_line = tk.Frame(title_container, bg='#D4AF37', height=2)
+        deco_line.pack(fill="x", pady=(10, 5))
+        
+        title_label = tk.Label(title_container, text="YOU ARE A:", 
+                              font=("Arial", title_font_size, "bold"), fg="#F5DEB3", bg='#3d2317')
+        title_label.pack(expand=True)
+        
+        # Subtitle for better context
+        subtitle_label = tk.Label(title_container, text="Please select your access level", 
+                                 font=("Arial", subtitle_font_size), fg="#D4AF37", bg='#3d2317')
+        subtitle_label.pack(pady=(0, 10))
+        
+        # Buttons container with enhanced styling
+        buttons_frame = tk.Frame(inner_container, bg='#2c1810')
+        buttons_frame.pack(fill="both", expand=True, padx=30, pady=20)
+        
+        # Create user type buttons with adaptive sizing
+        if self.is_square_display:
+            button_height = max(50, int(overlay_height * 0.12))
+        elif self.is_wide_display:
+            button_height = max(55, int(overlay_height * 0.10))  # Slightly shorter for wide screens
+        else:
+            button_height = max(52, int(overlay_height * 0.11))
+            
+        self.create_enhanced_button(buttons_frame, "👨‍🎓 STUDENT/STAFF", self.student_staff_clicked, "#D4AF37", "#8B7355", button_height, button_font_size)
+        self.create_enhanced_button(buttons_frame, "👤 VISITOR", self.guest_clicked, "#D4AF37", "#8B7355", button_height, button_font_size)
+        self.create_enhanced_button(buttons_frame, "⚙️ ADMIN", self.admin_clicked, "#CD853F", "#A0522D", button_height, button_font_size)
+        
+        # Separator line
+        separator = tk.Frame(buttons_frame, bg='#5c3e28', height=1)
+        separator.pack(fill="x", pady=15)
+        
+        # Exit button with enhanced styling
+        exit_height = max(45, int(overlay_height * 0.1))
+        exit_frame = tk.Frame(buttons_frame, bg='#2c1810', height=exit_height)
+        exit_frame.pack(fill="x", pady=(5, 10))
+        exit_frame.pack_propagate(False)
+        
+        exit_btn = tk.Button(exit_frame, text="🚪 EXIT SYSTEM", 
+                           font=("Arial", button_font_size, "bold"), bg="#8B4513", fg="#F5DEB3",
+                           bd=0, cursor="hand2", command=self.exit_system, 
+                           relief='flat', activebackground="#A0522D", activeforeground="white")
+        exit_btn.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        # Enhanced hover effects for exit button
+        def exit_on_enter(e):
+            exit_btn.config(bg="#A0522D", relief='raised', bd=1)
+        def exit_on_leave(e):
+            exit_btn.config(bg="#8B4513", relief='flat', bd=0)
+        
+        exit_btn.bind("<Enter>", exit_on_enter)
+        exit_btn.bind("<Leave>", exit_on_leave)
+        
+        # Bring overlay to front
+        self.main_overlay.lift()
+        self.create_vip_button()
+        
+    def create_enhanced_button(self, parent, text, command, primary_color, secondary_color, button_height, font_size):
+        """Create responsive enhanced styled button with advanced hover effects and icons"""
+        btn_frame = tk.Frame(parent, bg='#2c1810', height=button_height)
+        btn_frame.pack(fill="x", pady=8)
+        btn_frame.pack_propagate(False)
+        
+        # Button container for 3D effect
+        btn_container = tk.Frame(btn_frame, bg=secondary_color, bd=0)
+        btn_container.pack(fill="both", expand=True, padx=8, pady=3)
+        
+        # Main button
+        btn = tk.Button(btn_container, text=text, font=("Arial", font_size, "bold"),
+                       bg=primary_color, fg="#2F1B14", bd=0, cursor="hand2",
+                       command=command, relief='flat', 
+                       activebackground="#F0E68C", activeforeground="#2F1B14",
+                       padx=20, pady=15)
+        btn.pack(fill="both", expand=True, padx=2, pady=2)
+        
+        # Advanced hover effects with smooth transitions
+        def on_enter(e):
+            btn.config(bg="#F0E68C", relief='raised', bd=1)
+            btn_container.config(bg="#B8860B")
+            # Add subtle scaling effect
+            btn.config(font=("Arial", font_size + 1, "bold"))
+            
+        def on_leave(e):
+            btn.config(bg=primary_color, relief='flat', bd=0)
+            btn_container.config(bg=secondary_color)
+            btn.config(font=("Arial", font_size, "bold"))
+            
+        def on_click(e):
+            btn.config(bg="#DAA520", relief='sunken')
+            parent.after(100, lambda: btn.config(relief='flat'))
+            
+        btn.bind("<Enter>", on_enter)
+        btn.bind("<Leave>", on_leave)
+        btn.bind("<Button-1>", on_click)
+
+    def create_vip_button(self):
+        """Create responsive VIP button in bottom right corner"""
+        # Calculate responsive VIP button dimensions
+        vip_width = max(100, int(self.screen_width * 0.08))
+        vip_height = max(80, int(self.screen_height * 0.08))
+        
+        # Position in bottom right with responsive margin (moved up)
+        margin = max(10, int(self.screen_width * 0.01))
+        bottom_margin = max(30, int(self.screen_height * 0.04))  # Increased bottom margin
+        
+        # VIP button frame
+        self.vip_frame = tk.Frame(self.root, bg="#FF4444", bd=3, relief='raised')
+        self.vip_frame.place(x=self.screen_width - vip_width - margin, 
+                            y=self.screen_height - vip_height - bottom_margin, 
+                            width=vip_width, height=vip_height)
+        
+        # Responsive font size
+        vip_font_size = max(8, int(self.screen_width / 140))
+        
+        # VIP button
+        vip_btn = tk.Button(self.vip_frame, text="🌟\nVIP", 
+                          font=("Arial", vip_font_size, "bold"),
+                          bg="#FF4444", fg="white", bd=0, cursor="hand2",
+                          command=self.handle_vip_access, relief='flat',
+                          activebackground="#FF6666", activeforeground="white")
+        vip_btn.pack(fill="both", expand=True)
+        
+        # VIP button hover effects
+        def vip_on_enter(e):
+            vip_btn.config(bg="#FF6666", relief='raised')
+            self.vip_frame.config(bg="#FF6666")
+            
+        def vip_on_leave(e):
+            vip_btn.config(bg="#FF4444", relief='flat')
+            self.vip_frame.config(bg="#FF4444")
+            
+        vip_btn.bind("<Enter>", vip_on_enter)
+        vip_btn.bind("<Leave>", vip_on_leave)
+
+    # Keep all other methods unchanged
     def get_current_time_in_count(self):
-        """Get count of people currently timed in from centralized database"""
+        """Get count of people currently timed in"""
         try:
-            conn = sqlite3.connect("database/motorpass.db")
+            # Connect to database
+            conn = sqlite3.connect('database/motorpass.db')
             cursor = conn.cursor()
             
-            # Get count from current_status table
-            cursor.execute("SELECT COUNT(*) FROM current_status WHERE status = 'IN'")
+            # Count people who are currently timed in (status = 'IN')
+            cursor.execute("""
+                SELECT COUNT(*) FROM current_status 
+                WHERE status = 'IN'
+            """)
             count = cursor.fetchone()[0]
-            
             conn.close()
             return count
-            
         except Exception as e:
             print(f"Error getting time-in count: {e}")
             return 0
@@ -258,8 +532,6 @@ class MotorPassGUI:
         except Exception as e:
             print(f"Error getting VIP count: {e}")
             return 0
-
-    # REPLACE YOUR start_time_in_counter METHOD WITH THIS:
 
     def start_time_in_counter(self):
         """Start the time-in counter update thread (includes VIP counter)"""
@@ -300,508 +572,249 @@ class MotorPassGUI:
         clock_thread = threading.Thread(target=update_clock, daemon=True)
         clock_thread.start()
 
-    def create_selection_interface(self):
-        """Create modern glass-morphism selection interface"""
-        # Main overlay container - centered on screen with enhanced styling
-        overlay_width = 550
-        overlay_height = 500
-        
-        # Create shadow effect (multiple layers for depth)
-        shadow_offsets = [(6, 6, '#404040'), (4, 4, '#505050'), (2, 2, '#606060')]
-        for offset_x, offset_y, shadow_color in shadow_offsets:
-            shadow_frame = tk.Frame(self.root, bg=shadow_color)
-            shadow_frame.place(relx=0.5, rely=0.5, 
-                             width=overlay_width, height=overlay_height, 
-                             anchor='center', x=offset_x, y=offset_y)
-        
-        # Main container with glass morphism effect
-        self.main_overlay = tk.Frame(self.root, bg='#2c1810', bd=0, relief='flat')
-        self.main_overlay.place(relx=0.5, rely=0.5, width=overlay_width, height=overlay_height, anchor='center')
-        
-        # Add border effect
-        border_frame = tk.Frame(self.main_overlay, bg='#D4AF37', height=3)
-        border_frame.pack(fill="x", side="top")
-        
-        # Inner container with padding
-        inner_container = tk.Frame(self.main_overlay, bg='#2c1810')
-        inner_container.pack(fill="both", expand=True, padx=3, pady=3)
-        
-        # Title section with enhanced styling
-        title_container = tk.Frame(inner_container, bg='#3d2317', height=100)
-        title_container.pack(fill="x", padx=15, pady=(15, 0))
-        title_container.pack_propagate(False)
-        
-        # Decorative line above title
-        deco_line = tk.Frame(title_container, bg='#D4AF37', height=2)
-        deco_line.pack(fill="x", pady=(10, 5))
-        
-        title_label = tk.Label(title_container, text="YOU ARE A:", 
-                              font=("Arial", 22, "bold"), fg="#F5DEB3", bg='#3d2317')
-        title_label.pack(expand=True)
-        
-        # Subtitle for better context
-        subtitle_label = tk.Label(title_container, text="Please select your access level", 
-                                 font=("Arial", 10), fg="#D4AF37", bg='#3d2317')
-        subtitle_label.pack(pady=(0, 10))
-        
-        # Buttons container with enhanced styling
-        buttons_frame = tk.Frame(inner_container, bg='#2c1810')
-        buttons_frame.pack(fill="both", expand=True, padx=30, pady=20)
-        
-        # Create user type buttons with enhanced modern styling
-        self.create_enhanced_button(buttons_frame, "👨‍🎓 STUDENT/STAFF", self.student_staff_clicked, "#D4AF37", "#8B7355")
-        self.create_enhanced_button(buttons_frame, "👤 VISITOR", self.guest_clicked, "#D4AF37", "#8B7355")
-        self.create_enhanced_button(buttons_frame, "⚙️ ADMIN", self.admin_clicked, "#CD853F", "#A0522D")
-        
-        # Separator line
-        separator = tk.Frame(buttons_frame, bg='#5c3e28', height=1)
-        separator.pack(fill="x", pady=15)
-        
-        # Exit button with enhanced styling
-        exit_frame = tk.Frame(buttons_frame, bg='#2c1810', height=55)
-        exit_frame.pack(fill="x", pady=(5, 10))
-        exit_frame.pack_propagate(False)
-        
-        exit_btn = tk.Button(exit_frame, text="🚪 EXIT SYSTEM", 
-                           font=("Arial", 12, "bold"), bg="#8B4513", fg="#F5DEB3",
-                           bd=0, cursor="hand2", command=self.exit_system, 
-                           relief='flat', activebackground="#A0522D", activeforeground="white")
-        exit_btn.pack(fill="both", expand=True, padx=10, pady=5)
-        
-        # Enhanced hover effects for exit button
-        def exit_on_enter(e):
-            exit_btn.config(bg="#A0522D", relief='raised', bd=1)
-        def exit_on_leave(e):
-            exit_btn.config(bg="#8B4513", relief='flat', bd=0)
-        
-        exit_btn.bind("<Enter>", exit_on_enter)
-        exit_btn.bind("<Leave>", exit_on_leave)
-        
-        # Bring overlay to front
-        self.main_overlay.lift()
-        self.create_vip_button()
-        
-    def create_enhanced_button(self, parent, text, command, primary_color, secondary_color):
-        """Create enhanced styled button with advanced hover effects and icons"""
-        btn_frame = tk.Frame(parent, bg='#2c1810', height=65)
-        btn_frame.pack(fill="x", pady=8)
-        btn_frame.pack_propagate(False)
-        
-        # Button container for 3D effect
-        btn_container = tk.Frame(btn_frame, bg=secondary_color, bd=0)
-        btn_container.pack(fill="both", expand=True, padx=8, pady=3)
-        
-        # Main button
-        btn = tk.Button(btn_container, text=text, font=("Arial", 14, "bold"),
-                       bg=primary_color, fg="#2F1B14", bd=0, cursor="hand2",
-                       command=command, relief='flat', 
-                       activebackground="#F0E68C", activeforeground="#2F1B14",
-                       padx=20, pady=15)
-        btn.pack(fill="both", expand=True, padx=2, pady=2)
-        
-        # Advanced hover effects with smooth transitions
-        def on_enter(e):
-            btn.config(bg="#F0E68C", relief='raised', bd=1)
-            btn_container.config(bg="#B8860B")
-            # Add subtle scaling effect
-            btn.config(font=("Arial", 15, "bold"))
+    def handle_vip_access(self):
+        """Handle VIP access button click with authentication"""
+        # First authenticate admin
+        if not authenticate_admin_for_vip():
+            return
             
-        def on_leave(e):
-            btn.config(bg=primary_color, relief='flat', bd=0)
-            btn_container.config(bg=secondary_color)
-            btn.config(font=("Arial", 14, "bold"))
+        vip_window = tk.Toplevel(self.root)
+        vip_window.title("VIP Access")
+        vip_window.geometry("450x550")
+        vip_window.configure(bg="white")
+        vip_window.resizable(False, False)
+        
+        # Center the window
+        vip_window.update_idletasks()
+        x = (vip_window.winfo_screenwidth() // 2) - 225
+        y = (vip_window.winfo_screenheight() // 2) - 275
+        vip_window.geometry(f"450x550+{x}+{y}")
+        
+        vip_window.transient(self.root)
+        vip_window.grab_set()
+        
+        # Header
+        header_frame = tk.Frame(vip_window, bg="#FF4444", height=80)
+        header_frame.pack(fill="x")
+        header_frame.pack_propagate(False)
+        
+        tk.Label(header_frame, text="VIP ACCESS", 
+                font=("Arial", 20, "bold"), fg="white", bg="#FF4444").pack(expand=True)
+        
+        # Main form frame
+        form_frame = tk.Frame(vip_window, bg="white")
+        form_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        
+        # Instructions
+        instructions = tk.Label(form_frame, 
+                               text="Enter plate number - System will automatically\ndetermine TIME IN or TIME OUT",
+                               font=("Arial", 11), 
+                               fg="#666666", bg="white",
+                               justify="center")
+        instructions.pack(pady=(0, 20))
+        
+        # Plate Number Input
+        tk.Label(form_frame, text="Plate Number:", 
+                font=("Arial", 12, "bold"), bg="white", fg="#34495E").pack(anchor="w", pady=(0,5))
+        
+        plate_entry = tk.Entry(form_frame, font=("Arial", 14), 
+                              width=25, justify="center")
+        plate_entry.pack(pady=(0, 10), fill="x")
+        plate_entry.focus_set()
+        
+        # Status display
+        status_label = tk.Label(form_frame, text="Enter plate number to check status", 
+                               font=("Arial", 11), fg="#7F8C8D", bg="white",
+                               wraplength=350, justify="center")
+        status_label.pack(pady=(0, 20))
+        
+        # Purpose selection frame (hidden initially)
+        purpose_frame = tk.Frame(form_frame, bg="white")
+        purpose_var = tk.StringVar()
+        purpose_buttons = []
+        
+        tk.Label(purpose_frame, text="Select Purpose:", 
+                font=("Arial", 11, "bold"), bg="white", fg="#34495E").pack(anchor="w", pady=(0,10))
+        
+        # Create a sub-frame for the button grid to avoid geometry manager conflict
+        buttons_grid_frame = tk.Frame(purpose_frame, bg="white")
+        buttons_grid_frame.pack(fill="x")
+        
+        purposes = ["Meeting", "Delivery", "Maintenance", "Inspection", "Other"]
+        for i, purpose in enumerate(purposes):
+            btn = tk.Button(buttons_grid_frame, text=purpose, font=("Arial", 9),
+                           bg="#f0f0f0", fg="black", bd=1, relief='solid',
+                           width=12, cursor="hand2")
+            btn.grid(row=i//3, column=i%3, padx=3, pady=3, sticky="ew")
+            purpose_buttons.append(btn)
             
-        def on_click(e):
-            btn.config(bg="#DAA520", relief='sunken')
-            parent.after(100, lambda: btn.config(relief='flat'))
+            def select_purpose(p=purpose, b=btn):
+                purpose_var.set(p)
+                for button in purpose_buttons:
+                    button.config(bg="#f0f0f0", fg="black")
+                b.config(bg="#27AE60", fg="white")
             
-        btn.bind("<Enter>", on_enter)
-        btn.bind("<Leave>", on_leave)
-        btn.bind("<Button-1>", on_click)
+            btn.config(command=select_purpose)
         
-    def run_function_with_window(self, function, title):
-        """Run function with main window reference passed"""
-        try:
-            print(f"\n{'='*50}")
-            print(f"?? {title} Started")
-            print(f"{'='*50}")
-            
-            # Pass main window reference to the function
-            function(main_window=self.root)
-            
-            print(f"\n? {title} completed")
-            
-        except Exception as e:
-            print(f"? {title} error: {e}")
-            import traceback
-            traceback.print_exc()
+        # Configure grid weights for the buttons_grid_frame
+        for i in range(3):
+            buttons_grid_frame.grid_columnconfigure(i, weight=1)
         
-    def student_staff_clicked(self):
-        """Handle student button click"""
-        self.run_function(self.student_function, "Student/Staff Verification")
-        
-    def admin_clicked(self):
-        """Handle admin button click"""
-        self.run_function_with_window(self.admin_function, "Admin Panel")
-        
-    def guest_clicked(self):
-        """Handle guest button click"""
-        self.run_function(self.guest_function, "Guest Verification")
-        
-# --------------------------- VIP --------------
-
-    def create_vip_button(self):
-        """Create VIP button in bottom left corner"""
-        vip_button = tk.Button(self.root, text="🔴\nVIP", 
-                              font=("Arial", 12, "bold"), 
-                              bg="#FF4444", fg="white",
-                              width=6, height=3,
-                              bd=0, relief='flat',
-                              cursor="hand2",
-                              command=self.vip_clicked)
-        vip_button.place(x=50, y=self.root.winfo_screenheight()-150)
-        
-        # Make it circular-like with hover effects
-        def vip_on_enter(e):
-            vip_button.config(bg="#FF6666", relief='raised', bd=2)
-        def vip_on_leave(e):
-            vip_button.config(bg="#FF4444", relief='flat', bd=0)
-        
-        vip_button.bind("<Enter>", vip_on_enter)
-        vip_button.bind("<Leave>", vip_on_leave)
-
-    def vip_clicked(self):
-        """Handle VIP button click"""
-        self.show_vip_window()
-
-    def show_vip_window(self):
-        """SIMPLIFIED VIP Window - Ask for plate number and purpose if needed"""
-        try:
-            # First authenticate admin fingerprint
-            auth_result = authenticate_admin_for_vip()
-            
-            if not auth_result:
-                messagebox.showerror("Authentication Failed", 
-                                   "Admin fingerprint authentication required for VIP access!")
+        def check_plate_status():
+            plate_number = plate_entry.get().strip().upper()
+            if not plate_number:
+                status_label.config(text="Enter plate number to check status", fg="#7F8C8D")
+                purpose_frame.pack_forget()
                 return
             
-            vip_window = tk.Toplevel(self.root)
-            vip_window.title("🌟 VIP Access")
-            vip_window.geometry("450x550")
-            vip_window.configure(bg="white")
-            vip_window.resizable(False, False)
+            # Validate plate format
+            is_valid, validation_msg = validate_vip_plate_format(plate_number)
+            if not is_valid:
+                status_label.config(text=f"Invalid: {validation_msg}", fg="#E74C3C")
+                purpose_frame.pack_forget()
+                return
             
-            # Center the window
-            vip_window.update_idletasks()
-            x = (vip_window.winfo_screenwidth() // 2) - 225
-            y = (vip_window.winfo_screenheight() // 2) - 275
-            vip_window.geometry(f"450x550+{x}+{y}")
+            # Determine action
+            action_result = determine_vip_action(plate_number)
             
-            vip_window.transient(self.root)
-            vip_window.grab_set()
-            
-            # Header
-            header_frame = tk.Frame(vip_window, bg="#FF4444", height=80)
-            header_frame.pack(fill="x")
-            header_frame.pack_propagate(False)
-            
-            tk.Label(header_frame, text="🌟 VIP ACCESS", 
-                    font=("Arial", 20, "bold"), fg="white", bg="#FF4444").pack(expand=True)
-            
-            # Main form frame
-            form_frame = tk.Frame(vip_window, bg="white")
-            form_frame.pack(fill="both", expand=True, padx=30, pady=30)
-            
-            # Instructions
-            instructions = tk.Label(form_frame, 
-                                   text="Enter plate number - System will automatically\ndetermine TIME IN or TIME OUT",
-                                   font=("Arial", 11), 
-                                   fg="#666666", bg="white",
-                                   justify="center")
-            instructions.pack(pady=(0, 20))
-            
-            # Plate Number Input
-            tk.Label(form_frame, text="Plate Number:", 
-                    font=("Arial", 12, "bold"), bg="white", fg="#34495E").pack(anchor="w", pady=(0,5))
-            
-            plate_entry = tk.Entry(form_frame, font=("Arial", 14), 
-                                  width=25, justify="center")
-            plate_entry.pack(pady=(0,15))
-            plate_entry.focus()
-            
-            # Status Display
-            status_label = tk.Label(form_frame, text="Enter plate number to check status", 
-                                   font=("Arial", 10), bg="white", fg="#7F8C8D")
-            status_label.pack(pady=10)
-            
-            # Purpose Selection (initially hidden)
-            purpose_frame = tk.Frame(form_frame, bg="white")
-            
-            tk.Label(purpose_frame, text="Select Purpose:", 
-                    font=("Arial", 12, "bold"), bg="white", fg="#34495E").pack(pady=(10,5))
-            
-            purpose_var = tk.StringVar()
-            purposes = ["Official Visit", "Meeting", "Inspection", "Emergency"]
-            
-            purpose_buttons = []
-            for purpose in purposes:
-                btn = tk.Button(purpose_frame, text=purpose, 
-                               font=("Arial", 10), width=18,
-                               bg="#f0f0f0", fg="black",
-                               command=lambda p=purpose: select_purpose(p))
-                btn.pack(pady=2)
-                purpose_buttons.append(btn)
-            
-            def select_purpose(purpose):
-                purpose_var.set(purpose)
-                # Update button colors
+            if action_result['action'] == 'TIME_IN':
+                status_label.config(text="TIME IN - Select purpose below", fg="#27AE60")
+                purpose_frame.pack(fill="x", pady=10)
+                purpose_var.set("")  # Reset purpose
+                # Reset button colors
                 for btn in purpose_buttons:
-                    if btn['text'] == purpose:
-                        btn.config(bg="#3498DB", fg="white")
-                    else:
-                        btn.config(bg="#f0f0f0", fg="black")
+                    btn.config(bg="#f0f0f0", fg="black")
+            elif action_result['action'] == 'TIME_OUT':
+                vip_info = action_result['vip_info']
+                status_label.config(text=f"TIME OUT - {vip_info['purpose']}", fg="#E74C3C")
+                purpose_frame.pack_forget()
+            else:
+                status_label.config(text=f"Error: {action_result['message']}", fg="#E74C3C")
+                purpose_frame.pack_forget()
+        
+        # Bind plate entry to check status
+        plate_entry.bind('<KeyRelease>', lambda e: check_plate_status())
+        
+        # Buttons frame
+        button_frame = tk.Frame(form_frame, bg="white")
+        button_frame.pack(side="bottom", fill="x", pady=(30,0))
+        
+        def cancel_vip():
+            vip_window.destroy()
+        
+        def submit_vip():
+            plate_number = plate_entry.get().strip().upper()
             
-            def check_plate_status():
-                plate_number = plate_entry.get().strip().upper()
-                if not plate_number:
-                    status_label.config(text="Enter plate number to check status", fg="#7F8C8D")
-                    purpose_frame.pack_forget()
+            if not plate_number:
+                messagebox.showerror("Error", "Please enter plate number!")
+                return
+            
+            # Validate plate format
+            is_valid, validation_msg = validate_vip_plate_format(plate_number)
+            if not is_valid:
+                messagebox.showerror("Invalid Plate", validation_msg)
+                return
+            
+            # Determine action
+            action_result = determine_vip_action(plate_number)
+            
+            if action_result['action'] == 'TIME_IN':
+                purpose = purpose_var.get()
+                if not purpose:
+                    messagebox.showerror("Error", "Please select purpose for TIME IN!")
                     return
                 
-                # Validate plate format
-                is_valid, validation_msg = validate_vip_plate_format(plate_number)
-                if not is_valid:
-                    status_label.config(text=f"Invalid: {validation_msg}", fg="#E74C3C")
-                    purpose_frame.pack_forget()
-                    return
-                
-                # Determine action
-                action_result = determine_vip_action(plate_number)
-                
-                if action_result['action'] == 'TIME_IN':
-                    status_label.config(text="🟢 TIME IN - Select purpose below", fg="#27AE60")
-                    purpose_frame.pack(fill="x", pady=10)
-                    purpose_var.set("")  # Reset purpose
-                    # Reset button colors
-                    for btn in purpose_buttons:
-                        btn.config(bg="#f0f0f0", fg="black")
-                elif action_result['action'] == 'TIME_OUT':
+                # Process TIME IN
+                result = process_vip_time_in(plate_number, purpose)
+                if result['success']:
+                    messagebox.showinfo("Success", f"VIP TIME IN successful!\nPlate: {plate_number}\nPurpose: {purpose}")
+                    vip_window.destroy()
+                else:
+                    messagebox.showerror("Error", f"TIME IN failed: {result['message']}")
+                    
+            elif action_result['action'] == 'TIME_OUT':
+                # Process TIME OUT
+                result = process_vip_time_out(plate_number)
+                if result['success']:
                     vip_info = action_result['vip_info']
-                    status_label.config(text=f"🔴 TIME OUT - {vip_info['purpose']}", fg="#E74C3C")
-                    purpose_frame.pack_forget()
+                    messagebox.showinfo("Success", f"VIP TIME OUT successful!\nPlate: {plate_number}\nPurpose: {vip_info['purpose']}")
+                    vip_window.destroy()
                 else:
-                    status_label.config(text=f"Error: {action_result['message']}", fg="#E74C3C")
-                    purpose_frame.pack_forget()
-            
-            # Bind plate entry to check status
-            plate_entry.bind('<KeyRelease>', lambda e: check_plate_status())
-            
-            # Buttons
-            button_frame = tk.Frame(form_frame, bg="white")
-            button_frame.pack(side="bottom", fill="x", pady=(30,0))
-            
-            def cancel_vip():
-                vip_window.destroy()
-            
-            def submit_vip():
-                plate_number = plate_entry.get().strip().upper()
-                
-                if not plate_number:
-                    messagebox.showerror("Error", "Please enter plate number!")
-                    return
-                
-                # Validate plate format
-                is_valid, validation_msg = validate_vip_plate_format(plate_number)
-                if not is_valid:
-                    messagebox.showerror("Invalid Plate", validation_msg)
-                    return
-                
-                # Determine action
-                action_result = determine_vip_action(plate_number)
-                
-                if action_result['action'] == 'TIME_IN':
-                    purpose = purpose_var.get()
-                    if not purpose:
-                        messagebox.showerror("Error", "Please select purpose for TIME IN!")
-                        return
-                    
-                    # Process TIME IN
-                    result = process_vip_time_in(plate_number, purpose)
-                    
-                    if result['success']:
-                        messagebox.showinfo("VIP Success", 
-                                           f"✅ TIME IN Successful!\n\n" +
-                                           f"Plate: {plate_number}\n" +
-                                           f"Purpose: {purpose}\n" +
-                                           f"Time: {result['timestamp']}")
-                        vip_window.destroy()
-                    else:
-                        messagebox.showerror("Error", result['message'])
-                
-                elif action_result['action'] == 'TIME_OUT':
-                    # Process TIME OUT
-                    result = process_vip_time_out(plate_number)
-                    
-                    if result['success']:
-                        messagebox.showinfo("VIP Success", 
-                                           f"✅ TIME OUT Successful!\n\n" +
-                                           f"Plate: {plate_number}\n" +
-                                           f"Time: {result['timestamp']}")
-                        vip_window.destroy()
-                    else:
-                        messagebox.showerror("Error", result['message'])
-                
-                else:
-                    messagebox.showerror("Error", action_result['message'])
-            
-            tk.Button(button_frame, text="❌ Cancel", 
-                     font=("Arial", 12, "bold"), 
-                     bg="#E74C3C", fg="white",
-                     padx=20, pady=10,
-                     command=cancel_vip).pack(side="left")
-            
-            tk.Button(button_frame, text="✅ Process", 
-                     font=("Arial", 12, "bold"), 
-                     bg="#27AE60", fg="white",
-                     padx=20, pady=10,
-                     command=submit_vip).pack(side="right")
-            
-            # Enter key binding
-            plate_entry.bind('<Return>', lambda e: submit_vip())
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"VIP window failed: {str(e)}")
-       # -------------- ----------------- END VIP --------------------
-      
-    # MODIFIED ONLY THIS METHOD - added restart logic
-    def run_function(self, function, title):
-        """Hide GUI and run specified function - UPDATE THIS FUNCTION"""
+                    messagebox.showerror("Error", f"TIME OUT failed: {result['message']}")
+            else:
+                messagebox.showerror("Error", f"{action_result['message']}")
+        
+        # Cancel and Submit buttons
+        tk.Button(button_frame, text="Cancel", font=("Arial", 11, "bold"),
+                 bg="#95a5a6", fg="white", cursor="hand2",
+                 command=cancel_vip, width=12, pady=8).pack(side="left", padx=(0,10))
+        
+        tk.Button(button_frame, text="Submit", font=("Arial", 11, "bold"),
+                 bg="#27AE60", fg="white", cursor="hand2",
+                 command=submit_vip, width=12, pady=8).pack(side="right")
+
+    def run_function_with_window(self, function, title):
+        """Run function with main window reference passed (backwards compatible)"""
         try:
-            self.root.withdraw()
             print(f"\n{'='*50}")
-            print(f"🚗 {title} Started")
+            print(f"🚀 {title} Started")
             print(f"{'='*50}")
             
-            # Run the function
-            result = function()
+            # Check if function accepts main_window parameter
+            import inspect
+            sig = inspect.signature(function)
             
-            # Check if this needs restart (student or guest verification)
-            if 'Student' in title or 'Guest' in title:
-                print("✅ Transaction completed!")
-                print("🔄 Quick restart for fresh camera...")
-                
-                # Set restart flag
-                self._restart_needed = True
-                
-                # Super fast restart - just 1 second
-                import time
-                time.sleep(1)
-                
-                # Restart the application
-                self.restart_application()
-                return
+            if 'main_window' in sig.parameters:
+                # Function expects main_window parameter
+                function(main_window=self.root)
+            else:
+                # Function doesn't expect main_window parameter (backwards compatibility)
+                function()
             
-            return result
-            
-        except KeyboardInterrupt:
-            print(f"\n🛑 {title} interrupted by user")
-            # CHANGE: Handle Ctrl+C gracefully for verification processes
-            if 'Student' in title or 'Guest' in title:
-                print("🔄 Quick restart after interruption...")
-                self._restart_needed = True
-                import time
-                time.sleep(0.5)
-                self.restart_application()
-                return
-            # For other processes, just continue normally
+            print(f"\n✅ {title} completed")
             
         except Exception as e:
-            print(f"❌ Error in {title}: {str(e)}")
-            
-            # If transaction function failed, still restart for clean state
-            if 'Student' in title or 'Guest' in title:
-                print("🔄 Quick restart after transaction...")
-                self._restart_needed = True
-                import time
-                time.sleep(1)  # Fast restart on error too
-                self.restart_application()
-                return
-            
-            # For admin errors, show dialog and continue
-            try:
-                from tkinter import messagebox
-                messagebox.showerror("Error", f"An error occurred: {str(e)}")
-            except:
-                pass  # Skip messagebox if GUI issues
-            
-        finally:
-            # Only show window again if not restarting
-            if not hasattr(self, '_restart_needed') or not self._restart_needed:
-                try:
-                    self.root.deiconify()
-                except:
-                    pass  # Skip if window destroyed
+            print(f"❌ Error in {title}: {e}")
+            messagebox.showerror("Error", f"An error occurred in {title}:\n\n{str(e)}")
 
-    # ADDED ONLY THESE TWO METHODS - restart functionality
-    def restart_application(self):
-        """Restart the entire application - FAST VERSION"""
-        try:
-            print("🚀 Quick restart...")
-            
-            # Skip cleanup to avoid GPIO errors and be faster
-            # The new instance will handle cleanup at startup
-            
-            # Get current script info
-            main_script = sys.argv[0]  # This should be main.py
-            python_exe = sys.executable
-            
-            # Start new process immediately
-            subprocess.Popen([python_exe, main_script], 
-                           cwd=os.getcwd(),
-                           start_new_session=True)
-            
-            # Close current application immediately
+    def student_staff_clicked(self):
+        """Handle Student/Staff button click"""
+        self.run_function_with_window(self.student_function, "Student/Staff Verification")
+
+    def guest_clicked(self):
+        """Handle Visitor button click"""
+        self.run_function_with_window(self.guest_function, "Visitor Verification")
+
+    def admin_clicked(self):
+        """Handle Admin button click"""
+        self.run_function_with_window(self.admin_function, "Admin Panel")
+
+    def exit_system(self):
+        """Handle system exit"""
+        if messagebox.askyesno("Exit System", "Are you sure you want to exit MotorPass system?"):
+            print("\n" + "="*50)
+            print("🏁 MotorPass System Shutdown")
+            print("="*50)
             self.root.quit()
             self.root.destroy()
-            sys.exit(0)
-            
-        except Exception as e:
-            print(f"❌ Restart error: {e}")
-            # Fallback: try simple restart
-            self.simple_restart_application()
-    
-    def simple_restart_application(self):
-        """Simple restart using os.system (fallback method) - FAST VERSION"""
-        try:
-            print("🚀 Simple restart...")
-            
-            # Skip cleanup - let new instance handle it
-            # Simple restart command
-            main_script = os.path.abspath(sys.argv[0])
-            
-            # For Linux/Raspberry Pi
-            restart_cmd = f"python3 {main_script} &"
-            os.system(restart_cmd)
-            
-            # Exit current process
-            self.root.quit()
-            sys.exit(0)
-            
-        except Exception as e:
-            print(f"❌ Simple restart error: {e}")
-            self.root.quit()
-            
-    def exit_system(self):
-        """Exit the system with confirmation"""
-        if messagebox.askyesno("Exit System", "Are you sure you want to exit MotorPass?"):
-            self.root.quit()
-            
+            sys.exit()
+
     def run(self):
-        """Start the GUI application"""
+        """Run the main GUI"""
+        print(f"\n{'='*60}")
+        print(f"🚀 {self.system_name} System v{self.system_version} Started")
+        print(f"📱 Responsive Mode: {self.screen_width}x{self.screen_height}")
+        print(f"{'='*60}")
+        
+        # Handle window closing
+        self.root.protocol("WM_DELETE_WINDOW", self.exit_system)
+        
         try:
             self.root.mainloop()
-        finally:
-            try:
-                self.root.destroy()
-            except:
-                pass
+        except KeyboardInterrupt:
+            print("\n⚠️  System interrupted by user")
+            self.exit_system()
+        except Exception as e:
+            print(f"\n❌ System error: {e}")
+            messagebox.showerror("System Error", f"A critical error occurred:\n\n{str(e)}")
+            self.exit_system()

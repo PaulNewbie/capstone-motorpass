@@ -1,4 +1,4 @@
-# ui/guest_gui.py - Guest Verification GUI (Hybrid Approach)
+# ui/guest_gui.py - Responsive Guest GUI for 15" Square Touch Screen (1024x768)
 
 import tkinter as tk
 from tkinter import ttk
@@ -6,6 +6,7 @@ import threading
 from datetime import datetime
 import os
 from PIL import Image, ImageTk
+import queue
 
 class GuestVerificationGUI:
     def __init__(self, verification_function):
@@ -17,23 +18,73 @@ class GuestVerificationGUI:
         self.create_interface()
         
     def setup_window(self):
-        """Setup the main window"""
+        """Setup the main window with responsive fullscreen for touch screen"""
         self.root.title("MotorPass - VISITOR Verification")
         self.root.configure(bg='#8B4513')
         
         # Get screen dimensions
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
         
-        window_width = int(screen_width * 1)
-        window_height = int(screen_height * 0.95)
+        # Calculate aspect ratio to determine display type
+        aspect_ratio = self.screen_width / self.screen_height
+        self.is_square_display = abs(aspect_ratio - 1.0) < 0.3  # Within 30% of square (1024x768 = 1.33)
         
-        # Center window
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        
-        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        # Set fullscreen geometry
+        self.root.geometry(f"{self.screen_width}x{self.screen_height}")
         self.root.resizable(False, False)
+        
+        # Make window fullscreen and hide taskbar
+        try:
+            # Try Windows method first
+            self.root.state('zoomed')
+            # Hide taskbar by making window truly fullscreen
+            self.root.attributes('-fullscreen', True)
+        except:
+            # Fallback for other platforms
+            try:
+                self.root.attributes('-zoomed', True)
+                self.root.attributes('-fullscreen', True)
+            except:
+                # Final fallback - just maximize
+                self.root.state('normal')
+                self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
+        
+        # Bind F11 for fullscreen toggle (for testing/admin access)
+        self.root.bind('<F11>', self.toggle_fullscreen)
+        # Bind Ctrl+C for emergency abort
+        self.root.bind('<Control-c>', self.emergency_abort)
+        
+    def toggle_fullscreen(self, event=None):
+        """Toggle fullscreen mode - useful for admin access or testing"""
+        try:
+            current_state = self.root.attributes('-fullscreen')
+            self.root.attributes('-fullscreen', not current_state)
+            
+            if current_state:
+                print("Exited fullscreen mode (Taskbar visible) - Press F11 to return to fullscreen")
+            else:
+                print("Entered fullscreen mode (Taskbar hidden)")
+                
+        except Exception as e:
+            print(f"Error toggling fullscreen: {e}")
+            
+    def emergency_abort(self, event=None):
+        """Handle Ctrl+C - Emergency abort and close"""
+        print("\n🚨 EMERGENCY ABORT - Ctrl+C pressed")
+        print("🛑 Stopping all processes and closing...")
+        self.safe_close()
+        
+    def ensure_fullscreen(self):
+        """Ensure window stays fullscreen - call this after camera operations"""
+        try:
+            if not self.root.attributes('-fullscreen'):
+                print("🔧 Restoring fullscreen mode after camera operation...")
+                self.root.attributes('-fullscreen', True)
+                self.root.focus_force()  # Force focus back to our window
+                self.root.lift()  # Bring to front
+        except Exception as e:
+            print(f"Error ensuring fullscreen: {e}")
         
     def create_variables(self):
         """Create all tkinter variables"""
@@ -49,7 +100,7 @@ class GuestVerificationGUI:
         try:
             if not hasattr(self, 'root') or not self.root.winfo_exists():
                 return
-			    
+                    
             now = datetime.now()
             self.time_string.set(now.strftime("%H:%M:%S"))
             self.date_string.set(now.strftime("%A, %B %d, %Y"))
@@ -62,7 +113,7 @@ class GuestVerificationGUI:
             pass
     
     def create_interface(self):
-        """Create the main interface"""
+        """Create the responsive main interface"""
         # Main container
         main_container = tk.Frame(self.root, bg='#8B4513')
         main_container.pack(fill="both", expand=True)
@@ -70,14 +121,18 @@ class GuestVerificationGUI:
         # Header
         self.create_header(main_container)
         
-        # Content area
-        content_frame = tk.Frame(main_container, bg='#8B4513')
-        content_frame.pack(fill="both", expand=True, padx=40, pady=20)
+        # Content area with responsive padding
+        content_padding_x = max(20, int(self.screen_width * 0.02))
+        content_padding_y = max(15, int(self.screen_height * 0.02))
         
-        # Title
+        content_frame = tk.Frame(main_container, bg='#8B4513')
+        content_frame.pack(fill="both", expand=True, padx=content_padding_x, pady=content_padding_y)
+        
+        # Title with responsive font
+        title_font_size = max(24, int(min(self.screen_width, self.screen_height) / 32))
         title_label = tk.Label(content_frame, text="VISITOR VERIFICATION", 
-                              font=("Arial", 36, "bold"), fg="#FFFFFF", bg='#8B4513')
-        title_label.pack(pady=(0, 30))
+                              font=("Arial", title_font_size, "bold"), fg="#FFFFFF", bg='#8B4513')
+        title_label.pack(pady=(0, max(15, int(self.screen_height * 0.02))))
         
         # Main content panels
         panels_container = tk.Frame(content_frame, bg='#8B4513')
@@ -93,18 +148,23 @@ class GuestVerificationGUI:
         self.create_footer(main_container)
         
     def create_header(self, parent):
-        """Create header with logo and title"""
-        header = tk.Frame(parent, bg='#46230a', height=100)
+        """Create responsive header with logo and title"""
+        # Calculate responsive header height
+        header_height = max(80, int(self.screen_height * 0.11))
+        
+        header = tk.Frame(parent, bg='#46230a', height=header_height)
         header.pack(fill="x")
         header.pack_propagate(False)
         
-        # Header content
+        # Header content with responsive padding
+        header_padding = max(15, int(self.screen_width * 0.015))
         header_content = tk.Frame(header, bg='#46230a')
-        header_content.pack(fill="both", expand=True, padx=20, pady=10)
+        header_content.pack(fill="both", expand=True, padx=header_padding, pady=max(8, int(header_height * 0.1)))
         
-        # Logo container
+        # Logo container with responsive sizing
+        logo_size = max(60, int(header_height * 0.75))
         logo_container = tk.Frame(header_content, bg='#46230a')
-        logo_container.pack(side="left", padx=(0, 15))
+        logo_container.pack(side="left", padx=(0, max(12, int(self.screen_width * 0.012))))
         
         # Try to load logo
         logo_loaded = False
@@ -114,7 +174,7 @@ class GuestVerificationGUI:
             if os.path.exists(logo_path):
                 try:
                     logo_img = Image.open(logo_path)
-                    logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
+                    logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
                     self.logo_photo = ImageTk.PhotoImage(logo_img)
                     logo_label = tk.Label(logo_container, image=self.logo_photo, bg='#46230a')
                     logo_label.pack()
@@ -124,87 +184,100 @@ class GuestVerificationGUI:
                     pass
         
         if not logo_loaded:
-            # Fallback text logo
-            logo_frame = tk.Frame(logo_container, bg='#DAA520', width=80, height=80)
+            # Fallback text logo with responsive sizing
+            logo_frame = tk.Frame(logo_container, bg='#DAA520', width=logo_size, height=logo_size)
             logo_frame.pack()
             logo_frame.pack_propagate(False)
-            tk.Label(logo_frame, text="MP", font=("Arial", 28, "bold"), 
+            fallback_font_size = max(20, int(logo_size * 0.35))
+            tk.Label(logo_frame, text="MP", font=("Arial", fallback_font_size, "bold"), 
                     fg="#46230a", bg="#DAA520").place(relx=0.5, rely=0.5, anchor="center")
         
-        # Title section
+        # Title section with responsive fonts
         title_frame = tk.Frame(header_content, bg='#46230a')
         title_frame.pack(side="left", fill="both", expand=True)
         
-        tk.Label(title_frame, text="MotorPass", font=("Arial", 32, "bold"), 
+        # Responsive font sizes based on screen width
+        main_title_font = max(20, int(self.screen_width / 40))
+        subtitle_font = max(9, int(self.screen_width / 100))
+        
+        tk.Label(title_frame, text="MotorPass", font=("Arial", main_title_font, "bold"), 
                 fg="#DAA520", bg='#46230a').pack(anchor="w")
-        tk.Label(title_frame, text="Visitor Access Control System",
-                font=("Arial", 11), fg="#FFFFFF", bg='#46230a').pack(anchor="w")
+        tk.Label(title_frame, text="We secure the safeness of your motorcycle inside our campus",
+                font=("Arial", subtitle_font), fg="#FFFFFF", bg='#46230a').pack(anchor="w")
         
-        # Clock
-        clock_frame = tk.Frame(header_content, bg='#46230a', bd=2, relief='solid')
+        # Clock with responsive sizing
+        clock_width = max(140, int(self.screen_width * 0.14))
+        clock_height = max(65, int(header_height * 0.8))
+        
+        clock_frame = tk.Frame(header_content, bg='#46230a', bd=2, relief='solid',
+                              width=clock_width, height=clock_height)
         clock_frame.pack(side="right")
+        clock_frame.pack_propagate(False)
         
-        tk.Label(clock_frame, textvariable=self.time_string, font=("Arial", 18, "bold"), 
-                fg="#DAA520", bg='#46230a').pack(padx=15, pady=(10, 5))
-        tk.Label(clock_frame, textvariable=self.date_string, font=("Arial", 11), 
-                fg="#FFFFFF", bg='#46230a').pack(padx=15, pady=(0, 10))
-    
+        # Responsive clock fonts
+        time_font_size = max(14, int(self.screen_width / 55))
+        date_font_size = max(9, int(self.screen_width / 100))
+        
+        tk.Label(clock_frame, textvariable=self.time_string, font=("Arial", time_font_size, "bold"), 
+                fg="#DAA520", bg='#46230a').pack(padx=10, pady=(8, 3))
+        tk.Label(clock_frame, textvariable=self.date_string, font=("Arial", date_font_size), 
+                fg="#FFFFFF", bg='#46230a').pack(padx=10, pady=(0, 8))
+
     def create_left_panel(self, parent):
-        """Create left panel with status indicators"""
+        """Create responsive left panel with status indicators"""
         left_frame = tk.Frame(parent, bg='#8B4513')
-        left_frame.pack(side="left", fill="both", expand=True, padx=(0, 20))
+        panel_spacing = max(15, int(self.screen_width * 0.02))
+        left_frame.pack(side="left", fill="both", expand=True, padx=(0, panel_spacing))
         
-        # Status container
+        # Status container with responsive sizing
         status_container = tk.Frame(left_frame, bg='white', relief='raised', bd=3)
         status_container.pack(fill="both", expand=True)
         
-        # Title
-        tk.Label(status_container, text="VERIFICATION STATUS", 
-                font=("Arial", 20, "bold"), fg="#333333", bg='white').pack(pady=20)
+        # Title with responsive font
+        title_font_size = max(16, int(self.screen_width / 50))
+        title_padding_y = max(15, int(self.screen_height * 0.02))
         
-        # Status items
+        tk.Label(status_container, text="VERIFICATION STATUS", 
+                font=("Arial", title_font_size, "bold"), fg="#333333", bg='white').pack(pady=title_padding_y)
+        
+        # Status items with responsive spacing
+        status_padding_x = max(20, int(self.screen_width * 0.02))
+        status_padding_y = max(15, int(self.screen_height * 0.02))
+        
         status_items_frame = tk.Frame(status_container, bg='white')
-        status_items_frame.pack(fill="both", expand=True, padx=30)
+        status_items_frame.pack(fill="x", padx=status_padding_x, pady=(0, status_padding_y))
         
         self.create_status_item(status_items_frame, "🪖 HELMET CHECK:", self.helmet_status, 0)
-        self.create_status_item(status_items_frame, "📄 LICENSE SCAN:", self.license_status, 1)
-        
-        # Current step
-        step_frame = tk.Frame(status_container, bg='#f0f0f0', relief='sunken', bd=1)
-        step_frame.pack(fill="x", padx=20, pady=20)
-        
-        tk.Label(step_frame, text="Current Process:", font=("Arial", 12, "bold"), 
-                fg="#333333", bg='#f0f0f0').pack(anchor="w", padx=15, pady=(15, 5))
-        tk.Label(step_frame, textvariable=self.current_step, font=("Arial", 11), 
-                fg="#0066CC", bg='#f0f0f0', wraplength=400, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
-        
-        # Note about camera
-        note_frame = tk.Frame(status_container, bg='#fffacd')
-        note_frame.pack(fill="x", padx=20, pady=(0, 20))
-        
-        tk.Label(note_frame, text="📷 Note: Camera operations are shown in terminal window", 
-                font=("Arial", 10, "italic"), fg="#666666", bg='#fffacd').pack(padx=10, pady=10)
-    
-    def create_status_item(self, parent, label, status_var, row):
-        """Create a single status item"""
+        self.create_status_item(status_items_frame, "🪪 LICENSE SCAN:", self.license_status, 1)
+
+    def create_status_item(self, parent, label_text, status_var, row):
+        """Create individual status item with responsive design"""
+        # Container for this item with responsive spacing
+        item_spacing_y = max(15, int(self.screen_height * 0.02))
         item_frame = tk.Frame(parent, bg='white')
-        item_frame.pack(fill="x", pady=15)
+        item_frame.pack(fill="x", pady=item_spacing_y)
         
-        # Label
-        tk.Label(item_frame, text=label, font=("Arial", 14, "bold"), 
-                fg="#333333", bg='white', width=20, anchor="w").pack(side="left")
+        # Label with responsive typography
+        label_font_size = max(12, int(self.screen_width / 70))
+        tk.Label(item_frame, text=label_text, font=("Arial", label_font_size, "bold"), 
+                fg="#333333", bg='white').pack(side="left")
         
-        # Status badge
-        status_frame = tk.Frame(item_frame, bg='white')
-        status_frame.pack(side="left", padx=20)
+        # Status badge with responsive sizing
+        badge_font_size = max(10, int(self.screen_width / 85))
+        badge_padding_x = max(15, int(self.screen_width * 0.015))
+        badge_padding_y = max(6, int(self.screen_height * 0.008))
         
-        badge = tk.Label(status_frame, textvariable=status_var, font=("Arial", 12, "bold"), 
-                        fg="white", bg="#6C757D", padx=20, pady=8, relief="raised", bd=2)
-        badge.pack(side="left")
+        badge = tk.Label(item_frame, text="PENDING", font=("Arial", badge_font_size, "bold"), 
+                        fg="#FFFFFF", bg="#6C757D", padx=badge_padding_x, pady=badge_padding_y, relief='flat')
+        badge.pack(side="right", padx=(0, max(8, int(self.screen_width * 0.008))))
         
-        # Icon
-        icon_label = tk.Label(status_frame, text="", font=("Arial", 20), bg='white')
-        icon_label.pack(side="left", padx=(10, 0))
+        # Status icon with responsive size
+        icon_font_size = max(14, int(self.screen_width / 60))
+        icon_spacing = max(12, int(self.screen_width * 0.012))
+        
+        icon_label = tk.Label(item_frame, text="⏸", font=("Arial", icon_font_size), 
+                             fg="#6C757D", bg='white')
+        icon_label.pack(side="right", padx=(0, icon_spacing))
         
         # Store references
         setattr(self, f"badge_{row}", badge)
@@ -214,7 +287,7 @@ class GuestVerificationGUI:
         status_var.trace_add("write", lambda *args: self.update_status_display(row, status_var.get()))
     
     def update_status_display(self, row, status):
-        """Update status display colors and icons"""
+        """Update status display colors and icons with responsive styling"""
         badge = getattr(self, f"badge_{row}", None)
         icon = getattr(self, f"icon_{row}", None)
         
@@ -222,8 +295,8 @@ class GuestVerificationGUI:
             return
             
         status_configs = {
-            "VERIFIED": ("#28a745", "✓", "#28a745"),
-            "DETECTED": ("#28a745", "✓", "#28a745"),
+            "VERIFIED": ("#28a745", "✅", "#28a745"),
+            "DETECTED": ("#28a745", "✅", "#28a745"),
             "PROCESSING": ("#FFA500", "⏳", "#FFA500"),
             "CHECKING": ("#17a2b8", "🔍", "#17a2b8"),
             "FAILED": ("#DC3545", "❌", "#DC3545"),
@@ -231,12 +304,16 @@ class GuestVerificationGUI:
             "PENDING": ("#6C757D", "⏸", "#6C757D")
         }
         
-        config = status_configs.get(status.upper(), ("#6C757D", "", "#6C757D"))
-        badge.config(bg=config[0])
-        icon.config(text=config[1], fg=config[2])
+        config = status_configs.get(status.upper(), ("#6C757D", "⏸", "#6C757D"))
+        
+        # Update badge with responsive styling
+        badge_font_size = max(10, int(self.screen_width / 85))
+        badge.config(bg=config[0], text=status.upper(), font=("Arial", badge_font_size, "bold"))
+        icon_font_size = max(14, int(self.screen_width / 60))
+        icon.config(text=config[1], fg=config[2], font=("Arial", icon_font_size))
     
     def create_right_panel(self, parent):
-        """Create right panel with guest information"""
+        """Create responsive right panel with guest information"""
         right_frame = tk.Frame(parent, bg='#8B4513')
         right_frame.pack(side="right", fill="both", expand=True)
         
@@ -244,55 +321,74 @@ class GuestVerificationGUI:
         details_container = tk.Frame(right_frame, bg='white', relief='raised', bd=3)
         details_container.pack(fill="both", expand=True)
         
-        # Title
+        # Title with responsive font
+        title_font_size = max(16, int(self.screen_width / 50))
+        title_padding_y = max(15, int(self.screen_height * 0.02))
+        
         tk.Label(details_container, text="VISITOR INFORMATION", 
-                font=("Arial", 20, "bold"), fg="#333333", bg='white').pack(pady=20)
+                font=("Arial", title_font_size, "bold"), fg="#333333", bg='white').pack(pady=title_padding_y)
         
-        # Details content
+        # Details content with responsive padding
+        details_padding_x = max(15, int(self.screen_width * 0.015))
+        details_padding_y = max(8, int(self.screen_height * 0.01))
+        
         self.details_content = tk.Frame(details_container, bg='white')
-        self.details_content.pack(fill="both", expand=True, padx=20, pady=10)
+        self.details_content.pack(fill="both", expand=True, padx=details_padding_x, pady=details_padding_y)
         
-        # Initial message
+        # Initial message with responsive font
+        message_font_size = max(11, int(self.screen_width / 80))
         self.initial_message = tk.Label(self.details_content, 
                                        text="Starting visitor verification...\nPlease check the terminal window for camera operations.",
-                                       font=("Arial", 14), fg="#666666", bg='white', justify="center")
+                                       font=("Arial", message_font_size), fg="#666666", bg='white', justify="center")
         self.initial_message.pack(expand=True)
         
         # Hidden panels for later use
         self.create_hidden_panels()
     
     def create_hidden_panels(self):
-        """Create panels that will be shown later"""
+        """Create panels that will be shown later with responsive design"""
         # Guest info panel
         self.guest_info_panel = tk.Frame(self.details_content, bg='#e8f5e9', relief='ridge', bd=2)
         
+        # Responsive font for panel titles
+        panel_title_font = max(13, int(self.screen_width / 65))
+        panel_title_padding = max(12, int(self.screen_height * 0.015))
+        
         tk.Label(self.guest_info_panel, text="👤 GUEST DETAILS", 
-                font=("Arial", 16, "bold"), fg="#2e7d32", bg='#e8f5e9').pack(pady=15)
+                font=("Arial", panel_title_font, "bold"), fg="#2e7d32", bg='#e8f5e9').pack(pady=panel_title_padding)
         
         self.guest_details_frame = tk.Frame(self.guest_info_panel, bg='#e8f5e9')
-        self.guest_details_frame.pack(padx=20, pady=(0, 20))
+        details_padding_x = max(15, int(self.screen_width * 0.015))
+        details_padding_y = max(15, int(self.screen_height * 0.015))
+        self.guest_details_frame.pack(padx=details_padding_x, pady=(0, details_padding_y))
         
         # Verification summary panel
         self.summary_panel = tk.Frame(self.details_content, bg='#f5f5f5', relief='ridge', bd=2)
         
         tk.Label(self.summary_panel, text="🎯 VERIFICATION SUMMARY", 
-                font=("Arial", 16, "bold"), fg="#333333", bg='#f5f5f5').pack(pady=15)
+                font=("Arial", panel_title_font, "bold"), fg="#333333", bg='#f5f5f5').pack(pady=panel_title_padding)
         
         self.summary_frame = tk.Frame(self.summary_panel, bg='#f5f5f5')
-        self.summary_frame.pack(padx=20, pady=(0, 20))
+        self.summary_frame.pack(padx=details_padding_x, pady=(0, details_padding_y))
     
     def create_footer(self, parent):
-        """Create footer"""
-        footer = tk.Frame(parent, bg='#46230a', height=60)
+        """Create responsive footer"""
+        # Calculate responsive footer height
+        footer_height = max(50, int(self.screen_height * 0.07))
+        
+        footer = tk.Frame(parent, bg='#46230a', height=footer_height)
         footer.pack(fill="x")
         footer.pack_propagate(False)
         
+        # Responsive footer text font
+        footer_font_size = max(10, int(self.screen_width / 85))
+        
         footer_text = "🪖 Helmet Required → 📄 License Scan → 📝 Visitor Registration | ESC to exit"
-        tk.Label(footer, text=footer_text, font=("Arial", 12), 
+        tk.Label(footer, text=footer_text, font=("Arial", footer_font_size), 
                 fg="#FFFFFF", bg='#46230a').pack(expand=True)
     
     def show_guest_info(self, guest_info):
-        """Display guest information"""
+        """Display guest information with responsive design"""
         try:
             self.initial_message.pack_forget()
             
@@ -300,7 +396,10 @@ class GuestVerificationGUI:
             for widget in self.guest_details_frame.winfo_children():
                 widget.destroy()
             
-            # Create info labels
+            # Create info labels with responsive fonts
+            label_font_size = max(10, int(self.screen_width / 85))
+            value_font_size = max(10, int(self.screen_width / 85))
+            
             info_items = [
                 ("Name:", guest_info.get('name', 'Guest')),
                 ("Plate Number:", guest_info.get('plate_number', 'N/A')),
@@ -313,113 +412,129 @@ class GuestVerificationGUI:
                 info_items.insert(1, ("Guest No:", guest_info.get('guest_number', 'N/A')))
             
             for label, value in info_items:
+                row_spacing = max(2, int(self.screen_height * 0.003))
                 row = tk.Frame(self.guest_details_frame, bg='#e8f5e9')
-                row.pack(fill="x", pady=3)
+                row.pack(fill="x", pady=row_spacing)
                 
-                tk.Label(row, text=label, font=("Arial", 12, "bold"), 
-                        fg="#333333", bg='#e8f5e9', width=15, anchor="w").pack(side="left")
-                tk.Label(row, text=value, font=("Arial", 12), 
-                        fg="#2e7d32", bg='#e8f5e9').pack(side="left", padx=(10, 0))
+                label_width = max(12, int(self.screen_width / 70))
+                tk.Label(row, text=label, font=("Arial", label_font_size, "bold"), 
+                        fg="#333333", bg='#e8f5e9', width=label_width, anchor="w").pack(side="left")
+                tk.Label(row, text=value, font=("Arial", value_font_size), 
+                        fg="#2e7d32", bg='#e8f5e9').pack(side="left", padx=(8, 0))
             
-            self.guest_info_panel.pack(fill="x", pady=10)
+            # Show the guest info panel with responsive spacing
+            panel_spacing_y = max(15, int(self.screen_height * 0.02))
+            self.guest_info_panel.pack(fill="x", pady=(panel_spacing_y, 0))
         except Exception as e:
             print(f"Error showing guest info: {e}")
-    
-    def show_verification_summary(self, results):
-        """Display verification summary"""
+
+    def show_verification_summary(self, summary_data):
+        """Display verification summary with responsive design"""
         try:
             # Clear previous summary
             for widget in self.summary_frame.winfo_children():
                 widget.destroy()
             
-            # Create summary items
-            checks = [
-                ("Helmet Verification", results.get('helmet', False)),
-                ("License Detection", results.get('license', False))
-            ]
+            # Responsive fonts
+            summary_font_size = max(9, int(self.screen_width / 95))
             
-            for check_name, passed in checks:
-                row = tk.Frame(self.summary_frame, bg='#f5f5f5')
-                row.pack(fill="x", pady=5)
-                
-                # Icon
-                icon = "✅" if passed else "❌"
-                color = "#28a745" if passed else "#dc3545"
-                
-                tk.Label(row, text=icon, font=("Arial", 16), 
-                        fg=color, bg='#f5f5f5').pack(side="left")
-                
-                tk.Label(row, text=check_name, font=("Arial", 12), 
-                        fg="#333333", bg='#f5f5f5').pack(side="left", padx=(10, 0))
-                
-                status_text = "PASSED" if passed else "FAILED"
-                tk.Label(row, text=f"[{status_text}]", font=("Arial", 11, "bold"), 
-                        fg=color, bg='#f5f5f5').pack(side="right")
+            if isinstance(summary_data, dict):
+                for key, value in summary_data.items():
+                    summary_spacing = max(1, int(self.screen_height * 0.002))
+                    summary_row = tk.Frame(self.summary_frame, bg='#f5f5f5')
+                    summary_row.pack(fill="x", pady=summary_spacing)
+                    
+                    tk.Label(summary_row, text=f"{key}:", font=("Arial", summary_font_size, "bold"), 
+                            fg="#333333", bg='#f5f5f5', anchor="w").pack(side="left")
+                    tk.Label(summary_row, text=str(value), font=("Arial", summary_font_size), 
+                            fg="#666666", bg='#f5f5f5').pack(side="left", padx=(6, 0))
             
-            self.summary_panel.pack(fill="x", pady=10)
+            # Show the summary panel with responsive spacing
+            panel_spacing_y = max(8, int(self.screen_height * 0.01))
+            self.summary_panel.pack(fill="x", pady=(panel_spacing_y, 0))
         except Exception as e:
             print(f"Error showing verification summary: {e}")
-    
+
     def show_final_result(self, result):
-        """Show final verification result with improved design - matching student/staff styling"""
+        """Show final verification result with responsive design"""
         try:
             self.verification_complete = True
             
-            # Result box with yellow background and improved styling (same as student/staff)
-            result_box = tk.Frame(self.root, bg='#FFD700', relief='raised', bd=4)
-            result_box.place(relx=0.5, rely=0.5, anchor='center')
+            # Result box with responsive sizing and positioning
+            result_width = max(400, int(self.screen_width * 0.4))
+            result_height = max(300, int(self.screen_height * 0.35))
             
-            # Content with improved spacing (same as student/staff)
+            result_box = tk.Frame(self.root, bg='#FFD700', relief='raised', bd=4,
+                                 width=result_width, height=result_height)
+            result_box.place(relx=0.5, rely=0.5, anchor='center')
+            result_box.pack_propagate(False)
+            
+            # Content with responsive spacing
+            content_padding_x = max(35, int(result_width * 0.09))
+            content_padding_y = max(25, int(result_height * 0.08))
+            
             content = tk.Frame(result_box, bg='#FFD700')
-            content.pack(padx=50, pady=35)
+            content.pack(padx=content_padding_x, pady=content_padding_y, fill="both", expand=True)
             
             if result.get('verified', False):
-                # Success
-                icon_label = tk.Label(content, text="✅", font=("Arial", 50), bg='#FFD700')
-                icon_label.pack(pady=(0, 15))
+                # Success - responsive icon and fonts
+                icon_font_size = max(35, int(min(self.screen_width, self.screen_height) / 20))
+                title_font_size = max(18, int(self.screen_width / 45))
+                welcome_font_size = max(14, int(self.screen_width / 60))
+                action_font_size = max(11, int(self.screen_width / 80))
+                
+                icon_label = tk.Label(content, text="✅", font=("Arial", icon_font_size), bg='#FFD700')
+                icon_label.pack(pady=(0, max(10, int(result_height * 0.03))))
                 
                 title = tk.Label(content, text="VERIFICATION SUCCESSFUL", 
-                               font=("Arial", 24, "bold"), fg="#2E7D32", bg='#FFD700')
-                title.pack(pady=(0, 15))
+                               font=("Arial", title_font_size, "bold"), fg="#2E7D32", bg='#FFD700')
+                title.pack(pady=(0, max(10, int(result_height * 0.03))))
                 
-                # Format name (same logic as student/staff)
-                name = result.get('name', 'Guest')
+                # Format name
+                name = result.get('name', 'Visitor')
                 if ',' in name:
                     parts = name.split(',')
                     if len(parts) >= 2:
                         name = f"{parts[1].strip()} {parts[0].strip()}"
                 
                 welcome = tk.Label(content, text=f"Welcome, {name}!", 
-                                 font=("Arial", 18, "bold"), fg="#1B5E20", bg='#FFD700')
-                welcome.pack(pady=(0, 10))
+                                 font=("Arial", welcome_font_size, "bold"), fg="#1B5E20", bg='#FFD700')
+                welcome.pack(pady=(0, max(8, int(result_height * 0.025))))
                 
                 # Time action (adapted for visitor - show timestamp)
                 timestamp = result.get('timestamp', 'N/A')
                 action_text = f"Visitor Access Granted: {timestamp}"
                 
                 action_label = tk.Label(content, text=action_text, 
-                                       font=("Arial", 14), fg="#424242", bg='#FFD700')
-                action_label.pack(pady=(0, 5))
+                                       font=("Arial", action_font_size), fg="#424242", bg='#FFD700')
+                action_label.pack(pady=(0, max(4, int(result_height * 0.015))))
                 
             else:
-                # Failure
-                icon_label = tk.Label(content, text="❌", font=("Arial", 50), bg='#FFD700')
-                icon_label.pack(pady=(0, 15))
+                # Failure - responsive design
+                icon_font_size = max(35, int(min(self.screen_width, self.screen_height) / 20))
+                title_font_size = max(18, int(self.screen_width / 45))
+                reason_font_size = max(12, int(self.screen_width / 70))
+                
+                icon_label = tk.Label(content, text="❌", font=("Arial", icon_font_size), bg='#FFD700')
+                icon_label.pack(pady=(0, max(10, int(result_height * 0.03))))
                 
                 title = tk.Label(content, text="VERIFICATION FAILED", 
-                               font=("Arial", 24, "bold"), fg="#C62828", bg='#FFD700')
-                title.pack(pady=(0, 15))
+                               font=("Arial", title_font_size, "bold"), fg="#C62828", bg='#FFD700')
+                title.pack(pady=(0, max(10, int(result_height * 0.03))))
                 
+                reason_wrap_length = max(300, int(result_width * 0.75))
                 reason = tk.Label(content, text=result.get('reason', 'Unknown error'), 
-                                font=("Arial", 16), fg="#424242", bg='#FFD700', wraplength=400)
-                reason.pack(pady=(0, 10))
+                                font=("Arial", reason_font_size), fg="#424242", bg='#FFD700', 
+                                wraplength=reason_wrap_length)
+                reason.pack(pady=(0, max(8, int(result_height * 0.025))))
             
-            # Auto close after 5 seconds (same as student/staff)
-            self.root.after(5000, self.close)
+            # Auto close with responsive timing
+            close_delay = 4000 if result.get('verified', False) else 5000
+            self.root.after(close_delay, self.safe_close)
             
         except Exception as e:
             print(f"Error showing final result: {e}")
-            self.close()
+            self.safe_close()
         
     def update_status(self, updates):
         """Update status from verification thread"""
@@ -437,6 +552,9 @@ class GuestVerificationGUI:
                     self.show_verification_summary(value)
                 elif key == 'final_result':
                     self.show_final_result(value)
+                elif key == 'camera_operation_complete':
+                    # Restore fullscreen after camera operations
+                    self.root.after(500, self.ensure_fullscreen)  # Small delay to ensure camera cleanup
         except Exception as e:
             print(f"Error updating status: {e}")
     
@@ -488,7 +606,7 @@ class GuestVerificationGUI:
                         self.root.after(0, lambda: self.update_status({'final_result': error_result}))
                     except RuntimeError as e:
                         print(f"⚠️ Error GUI update skipped: {e}")
-                 
+
     def check_verification_result(self):
         """ADD this new function"""
         try:
@@ -572,8 +690,14 @@ class GuestVerificationGUI:
     def run(self):
         """Main GUI loop - UPDATE THIS FUNCTION"""
         try:
+            print(f"\n{'='*60}")
+            print(f"🎫 Guest Verification GUI Started")
+            print(f"📱 Responsive Mode: {self.screen_width}x{self.screen_height}")
+            if self.is_square_display:
+                print(f"📺 Display Type: Square/4:3 Touch Screen Optimized")
+            print(f"{'='*60}")
+            
             # ADD: Initialize thread-safe queue and running flag
-            import queue
             self.result_queue = queue.Queue()
             self.is_running = True
             
@@ -583,8 +707,9 @@ class GuestVerificationGUI:
             # Handle window close
             self.root.protocol("WM_DELETE_WINDOW", self.safe_close)
             
-            # Bind escape key
-            self.root.bind('<Escape>', lambda e: self.safe_close())
+            # Bind F11 for fullscreen toggle and Ctrl+C for emergency abort
+            self.root.bind('<F11>', self.toggle_fullscreen)
+            self.root.bind('<Control-c>', self.emergency_abort)
             
             # REMOVE THE DUPLICATE: Don't create another thread here
             # The start_verification() already creates a thread

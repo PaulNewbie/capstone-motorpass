@@ -1,7 +1,7 @@
 # config.py - Updated for Students & Staff with Simple Dev Mode
 
 SYSTEM_NAME = "MOTORPASS"
-SYSTEM_VERSION = "1.3"  
+SYSTEM_VERSION = "1.5"  
 
 # =============================================================================
 # 🛠️ SIMPLE DEV MODE - Just change True/False
