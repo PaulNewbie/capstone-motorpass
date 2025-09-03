@@ -1,6 +1,7 @@
 # utils/gui_helpers.py - Fixed GUI Helper Functions
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
+import threading
 import os
 
 def show_results_gui(title, image=None, text="", success=True, details=None):
@@ -448,9 +449,156 @@ def show_message_gui(message, title="MotorPass", message_type="info"):
         messagebox.showinfo(title, message)
 
 def get_user_input_gui(prompt, title="Input Required", default_value=""):
-    """Get user input through a GUI dialog"""
-    return simpledialog.askstring(title, prompt, initialvalue=default_value)
-
+    """
+    Thread-safe GUI input dialog with better focus handling
+    
+    Args:
+        prompt (str): The prompt message
+        title (str): Dialog title  
+        default_value (str): Default input value
+        
+    Returns:
+        str or None: User input or None if cancelled
+    """
+    result = [None]  # Use list to store result from nested function
+    
+    def create_dialog():
+        # Create dialog window
+        dialog = tk.Toplevel()
+        dialog.title(title)
+        dialog.geometry("500x300")
+        dialog.configure(bg="#FFFFFF")
+        dialog.resizable(False, False)
+        
+        # Center the window
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
+        dialog.geometry(f"500x300+{x}+{y}")
+        
+        # Make window modal and stay on top
+        dialog.transient()
+        dialog.grab_set()
+        dialog.attributes('-topmost', True)
+        dialog.focus_force()  # Force focus
+        
+        # Main container
+        main_frame = tk.Frame(dialog, bg="#FFFFFF", padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True)
+        
+        # Title
+        title_label = tk.Label(main_frame,
+                              text=title,
+                              font=("Arial", 16, "bold"),
+                              fg="#2C3E50",
+                              bg="#FFFFFF")
+        title_label.pack(pady=(0, 15))
+        
+        # Prompt message
+        prompt_label = tk.Label(main_frame,
+                               text=prompt,
+                               font=("Arial", 12),
+                               fg="#34495E",
+                               bg="#FFFFFF",
+                               wraplength=450,
+                               justify="left")
+        prompt_label.pack(pady=(0, 20))
+        
+        # Input frame
+        input_frame = tk.Frame(main_frame, bg="#FFFFFF")
+        input_frame.pack(fill="x", pady=(0, 20))
+        
+        input_label = tk.Label(input_frame,
+                              text="Enter name:",
+                              font=("Arial", 11, "bold"),
+                              fg="#34495E",
+                              bg="#FFFFFF")
+        input_label.pack(anchor="w", pady=(0, 5))
+        
+        # Text entry
+        entry_var = tk.StringVar(value=default_value)
+        entry = tk.Entry(input_frame,
+                        textvariable=entry_var,
+                        font=("Arial", 12),
+                        width=40,
+                        relief="solid",
+                        bd=1)
+        entry.pack(fill="x", pady=(0, 10))
+        
+        # Focus on the entry field and select all text
+        entry.focus_set()
+        entry.select_range(0, tk.END)
+        
+        # Buttons frame
+        button_frame = tk.Frame(main_frame, bg="#FFFFFF")
+        button_frame.pack(fill="x", pady=(10, 0))
+        
+        def on_ok():
+            result[0] = entry_var.get().strip()
+            dialog.destroy()
+        
+        def on_cancel():
+            result[0] = None
+            dialog.destroy()
+        
+        # Cancel button
+        cancel_btn = tk.Button(button_frame,
+                              text="Cancel",
+                              font=("Arial", 11),
+                              bg="#95A5A6",
+                              fg="white",
+                              padx=20,
+                              pady=8,
+                              relief="flat",
+                              cursor="hand2",
+                              command=on_cancel)
+        cancel_btn.pack(side="left")
+        
+        # OK button
+        ok_btn = tk.Button(button_frame,
+                          text="OK",
+                          font=("Arial", 11, "bold"),
+                          bg="#27AE60",
+                          fg="white",
+                          padx=20,
+                          pady=8,
+                          relief="flat",
+                          cursor="hand2",
+                          command=on_ok)
+        ok_btn.pack(side="right")
+        
+        # Bind Enter key to OK
+        def on_enter(event):
+            on_ok()
+        
+        entry.bind('<Return>', on_enter)
+        dialog.bind('<Return>', on_enter)
+        
+        # Bind Escape key to Cancel
+        def on_escape(event):
+            on_cancel()
+        
+        dialog.bind('<Escape>', on_escape)
+        
+        # Handle window close
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+        
+        # Wait for dialog to complete
+        dialog.wait_window()
+    
+    # Run dialog in main thread
+    if threading.current_thread() is threading.main_thread():
+        create_dialog()
+    else:
+        # If called from another thread, schedule on main thread
+        root = tk.Tk()
+        root.withdraw()  # Hide the temporary root
+        root.after(0, create_dialog)
+        root.mainloop()
+        root.destroy()
+    
+    return result[0]
+    
 def confirm_action_gui(message, title="Confirm Action"):
     """Show a confirmation dialog"""
     return messagebox.askyesno(title, message)

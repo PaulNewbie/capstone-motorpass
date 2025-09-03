@@ -21,6 +21,8 @@ import time
 from datetime import datetime
 import tkinter as tk
 import tkinter.messagebox as msgbox
+import threading 
+import queue
 
 def student_verification():
     """Main student/staff verification with GUI"""
@@ -174,9 +176,10 @@ def run_verification_with_gui(status_callback):
             print("📄 LICENSE CAPTURE (Terminal Camera)")
             print("="*60)
             
-            from etc.services.license_reader import _count_verification_keywords
+            from etc.services.license_reader import _count_verification_keywords, extract_text_from_image, _detect_name_pattern
             license_success = False
             image_path = None
+            actual_license_name = None  # Track detected name across attempts
             
             for attempt in range(2):  # Try twice
                 print(f"\n📷 License attempt {attempt + 1}/2")
@@ -211,62 +214,174 @@ def run_verification_with_gui(status_callback):
                     
                     keywords_found = _count_verification_keywords(ocr_text)
                     
-                    # FIXED: Also check for name matching, not just license keywords
-                    # from services.license_reader import find_best_line_match
+                    # OPTIMIZED: Get the actual name on the license (like guest flow)
                     ocr_lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
-                    _, name_match_score = find_best_line_match(user_info.get('name', ''), ocr_lines)
+                    actual_license_name = _detect_name_pattern(ocr_text)
                     
-                    # Success if we have enough keywords OR good name match (60%+)
-                    has_good_keywords = keywords_found >= 3
-                    has_good_name_match = name_match_score and name_match_score >= 0.6
+                    # NEW: Clear terminal output showing actual vs expected names
+                    print(f"\n📋 LICENSE SCAN RESULTS (Attempt {attempt + 1}/2):")
+                    print(f"🎯 Expected Name: '{user_info.get('name', 'N/A')}'")
+                    print(f"🔍 License Holder: '{actual_license_name if actual_license_name else 'NOT FOUND'}'")
+                    print(f"📄 Keywords Found: {keywords_found}")
                     
-                    if has_good_keywords or has_good_name_match:
-                        if has_good_name_match:
-                            print(f"✅ License accepted: Name match {name_match_score*100:.1f}% (Keywords: {keywords_found})")
+                    # Check if names match (basic comparison)
+                    name_matches = False
+                    name_found = actual_license_name is not None and actual_license_name.strip() != ""
+                    similarity_score = 0.0
+                    
+                    if actual_license_name and user_info.get('name'):
+                        # Calculate similarity directly
+                        import difflib
+                        similarity_score = difflib.SequenceMatcher(
+                            None, 
+                            actual_license_name.lower().strip(), 
+                            user_info.get('name', '').lower().strip()
+                        ).ratio()
+                        
+                        # Consider it a match if very high similarity (90%+) or exact match
+                        if similarity_score >= 0.9:
+                            name_matches = True
+                            print(f"✅ STRONG MATCH: {similarity_score*100:.1f}% similarity")
                         else:
-                            print(f"✅ License accepted: Keywords {keywords_found} (Name match: {(name_match_score*100):.1f}%)")
+                            print(f"⚠️ NAME MISMATCH: {similarity_score*100:.1f}% similarity")
+                            print(f"   Expected: {user_info.get('name', '')}")
+                            print(f"   License:  {actual_license_name}")
+                    elif not name_found:
+                        print(f"❌ NO NAME DETECTED: Could not extract name from license")
+                    
+                    # SUCCESS CONDITIONS: Name match overrides keyword requirement
+                    has_good_keywords = keywords_found >= 3
+                    has_some_keywords = keywords_found >= 1
+                    perfect_conditions = has_some_keywords and name_found and name_matches
+                    
+                    if perfect_conditions:
+                        # SUCCESS: Name matches (even with few keywords)
+                        print(f"✅ License accepted: Strong name match ({similarity_score*100:.1f}%) overrides keyword requirement")
+                        print(f"🎯 SUCCESS: Name match confirmed with {keywords_found} keywords")
                         license_success = True
                         break
-                    elif attempt == 0:  # First attempt failed
-                        print(f"⚠️ Poor scan: Keywords {keywords_found}, Name match {(name_match_score*100 if name_match_score else 0):.1f}%")
-                        if not msgbox.askyesno("Retry?", "Poor scan quality. Try again?"):
-                            break
-            
-            if not license_success:
-                if msgbox.askyesno("Admin Override", "Use admin fingerprint?"):
-                    if check_admin_fingerprint():
-                        print("✅ Admin override successful")
+                    
+                    # AUTO-RETRY CONDITIONS (First attempt)
+                    elif attempt == 0:
+                        # Retry for ANY imperfect condition
+                        retry_reasons = []
+                        if not has_some_keywords:
+                            retry_reasons.append(f"only {keywords_found} keywords (need at least 1)")
+                        elif not has_good_keywords and not name_matches:
+                            retry_reasons.append(f"only {keywords_found} keywords (need 3+ when name doesn't match)")
+                        if not name_found:
+                            retry_reasons.append("no name detected")
+                        elif not name_matches and has_some_keywords:
+                            retry_reasons.append(f"name mismatch ({similarity_score*100:.1f}% similarity)")
                         
-                        # FIXED: Skip license verification flow and go directly to time tracking
-                        # Record TIME IN
-                        if record_time_in(user_info):
-                            timestamp = time.strftime('%H:%M:%S')
-                            status_callback({'current_step': f'✅ TIME IN recorded at {timestamp}'})
-                            set_led_success(duration=5.0)
-                            play_success()
-                            
-                            result = {
-                                'verified': True,
-                                'name': user_info['name'],
-                                'time_action': 'IN',
-                                'timestamp': timestamp,
-                                'admin_override': True  # Mark as admin override
-                            }
-                            cleanup_buzzer()
-                            return result
+                        print(f"⚠️ RETRY NEEDED: {', '.join(retry_reasons)}")
+                        print(f"🔄 AUTO-RETRYING: Second attempt starting...")
+                        status_callback({'current_step': '🔄 Auto-retrying license scan...'})
+                        
+                    else:  # Second attempt - more lenient acceptance
+                        if has_some_keywords and name_found:
+                            if name_matches:
+                                print(f"✅ License accepted: Name match ({similarity_score*100:.1f}%) + {keywords_found} keywords (2nd attempt)")
+                                print(f"🎯 SUCCESS: Name confirmed on second attempt")
+                            else:
+                                print(f"✅ License accepted: {keywords_found} keywords + name detected (2nd attempt)")
+                                print(f"📄 SUCCESS: Valid license detected (name verification in next stage)")
+                            license_success = True
+                            break
                         else:
-                            status_callback({'current_step': '❌ Failed to record time'})
-                            set_led_idle()
-                            play_failure()
+                            # Still not good enough after 2 attempts
+                            print(f"⚠️ SECOND ATTEMPT FAILED:")
+                            if not has_some_keywords and not name_found:
+                                print(f"   - Only {keywords_found} keywords (need at least 1)")
+                                print(f"   - No name detected")
+                            elif not has_some_keywords:
+                                print(f"   - Only {keywords_found} keywords (need at least 1)")
+                            elif not name_found:
+                                print(f"   - Name detection failed")
+                            
+                            print("❌ Both automatic attempts failed")
+                            # Will offer manual input after the loop
+                        
+                else:
+                    # Camera capture failed 
+                    print(f"❌ Camera capture failed on attempt {attempt + 1}")
+                    if attempt == 0:  # First attempt failed
+                        print("❌ Student Driver License likely detected in camera preview")
+                        status_callback({'current_step': '❌ Student Driver License not allowed - Access denied'})
+                        set_led_idle()
+                        play_failure()
+                        cleanup_buzzer()
+                        return {'verified': False, 'reason': 'Student Driver License not allowed'}
+                    # Second attempt camera failure continues to manual input
+
+            # ENHANCED: Manual input option after 2 failed attempts
+            if not license_success:
+                # Check if we have ANY valid license data from either attempt
+                last_attempt_had_keywords = keywords_found >= 1  # At least 1 keyword indicates a license
+                
+                if last_attempt_had_keywords:
+                    # We detected a license but quality was poor - offer manual input
+                    print(f"\n🤔 MANUAL INPUT OPTION:")
+                    print(f"   License detected but scan quality insufficient")
+                    print(f"   Expected: {user_info.get('name', 'N/A')}")
+                    if actual_license_name:
+                        print(f"   Detected: {actual_license_name}")
+                    
+                    if msgbox.askyesno("Manual Input", 
+                                     f"License scan quality insufficient.\n\n"
+                                     f"Expected: {user_info.get('name', 'N/A')}\n"
+                                     f"Detected: {actual_license_name if actual_license_name else 'Not found'}\n\n"
+                                     f"Enter name manually?"):
+                        
+                        from etc.utils.gui_helpers import get_user_input_gui
+                        
+                        expected_name = user_info.get('name', 'N/A')
+                        manual_name = get_user_input_gui(
+                            f"Expected: {expected_name}\n\nEnter name from license:",
+                            "Manual License Input",
+                            expected_name
+                        )
+                        
+                        if manual_name and manual_name.strip():
+                            manual_name = manual_name.strip().title()
+                            print(f"✅ Manual license input: {manual_name}")
+                            
+                            # Record TIME IN with manual input
+                            if record_time_in(user_info):
+                                timestamp = time.strftime('%H:%M:%S')
+                                status_callback({'current_step': f'✅ TIME IN recorded at {timestamp} (Manual Input)'})
+                                set_led_success(duration=5.0)
+                                play_success()
+                                
+                                result = {
+                                    'verified': True,
+                                    'name': user_info['name'],
+                                    'time_action': 'IN',
+                                    'timestamp': timestamp,
+                                    'manual_input': True,
+                                    'manual_name': manual_name
+                                }
+                                cleanup_buzzer()
+                                return result
+                            else:
+                                status_callback({'current_step': '❌ Failed to record time'})
+                                set_led_idle()
+                                play_failure()
+                                cleanup_buzzer()
+                                return {'verified': False, 'reason': 'Failed to record time'}
+                        else:
+                            print("❌ Manual input cancelled or empty")
                             cleanup_buzzer()
-                            return {'verified': False, 'reason': 'Failed to record time'}
+                            return {'verified': False, 'reason': 'Manual input cancelled'}
                     else:
                         cleanup_buzzer()
-                        return {'verified': False, 'reason': 'Admin override failed'}
+                        return {'verified': False, 'reason': 'Manual input declined'}
                 else:
+                    # No license detected at all - just fail
+                    print("❌ No valid license detected in either attempt")
                     cleanup_buzzer()
-                    return {'verified': False, 'reason': 'License verification cancelled'}
-            
+                    return {'verified': False, 'reason': 'No valid license detected'}
+
             # ONLY run verification flow if license captured successfully
             if license_success and image_path:
                 status_callback({'current_step': '🔍 Verifying license against fingerprint...'})
@@ -281,11 +396,11 @@ def run_verification_with_gui(status_callback):
                     )
                 except ValueError as e:
                     if "STUDENT_PERMIT_DETECTED" in str(e):
-                        status_callback({'current_step': '❌ Student Permit detected - Access denied'})
+                        status_callback({'current_step': '❌ Student Driver License detected - Access denied'})
                         set_led_idle()
                         play_failure()
                         cleanup_buzzer()
-                        return {'verified': False, 'reason': 'Student Permit not allowed'}
+                        return {'verified': False, 'reason': 'Student Driver License not allowed'}
                     else:
                         raise e
                 
@@ -320,31 +435,273 @@ def run_verification_with_gui(status_callback):
                         play_failure()
                         result = {'verified': False, 'reason': 'Failed to record TIME IN'}
                 else:
-                    status_callback({'current_step': '❌ License verification failed'})
-                    set_led_idle()
-                    play_failure()
-                    result = {'verified': False, 'reason': 'License verification failed'}
-            else:
-                status_callback({'current_step': '❌ License capture failed'})
-                set_led_idle()
-                play_failure()
-                result = {'verified': False, 'reason': 'License capture failed'}
-                
-    except Exception as e:
-        print(f"❌ Verification error: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        status_callback({'current_step': f'❌ System error: {str(e)}'})
-        set_led_idle()
-        play_failure()
-        result = {'verified': False, 'reason': f'System error: {str(e)}'}
+                    print("\n🤔 VERIFICATION FAILED - OPENING MANUAL INPUT DIALOG:")
+                    print("   License detected but names don't match closely enough")
+                    print(f"   Expected: {user_info.get('name', 'N/A')}")
+                    if actual_license_name:
+                        print(f"   License shows: {actual_license_name}")
+                    
+                    print("🔍 DEBUG: Creating professional manual input dialog...")
+                    
+                    try:
+                        # Thread-safe manual input dialog
+                        import tkinter as tk
+                        from tkinter import messagebox
+                        import queue
+                        import threading
+                        
+                        # Create result queue
+                        dialog_result = queue.Queue()
+                        
+                        def show_manual_input_dialog():
+                            """Create a professional manual input dialog in main thread"""
+                            try:
+                                # Create new toplevel window
+                                dialog = tk.Toplevel()
+                                dialog.title("Manual Name Override Required")
+                                dialog.geometry("500x350")
+                                dialog.configure(bg="#FFFFFF")
+                                dialog.resizable(False, False)
+                                
+                                # Center window
+                                dialog.update_idletasks()
+                                x = (dialog.winfo_screenwidth() // 2) - (250)
+                                y = (dialog.winfo_screenheight() // 2) - (175)
+                                dialog.geometry(f"500x350+{x}+{y}")
+                                
+                                # Make modal and topmost
+                                dialog.transient()
+                                dialog.grab_set()
+                                dialog.attributes('-topmost', True)
+                                dialog.focus_force()
+                                
+                                # Create content
+                                main_frame = tk.Frame(dialog, bg="#FFFFFF", padx=20, pady=20)
+                                main_frame.pack(fill="both", expand=True)
+                                
+                                # Title
+                                title_label = tk.Label(main_frame,
+                                                      text="⚠️ Manual Override Required",
+                                                      font=("Arial", 16, "bold"),
+                                                      fg="#E74C3C",
+                                                      bg="#FFFFFF")
+                                title_label.pack(pady=(0, 15))
+                                
+                                # Info frame
+                                info_frame = tk.LabelFrame(main_frame, 
+                                                          text=" Verification Details ",
+                                                          font=("Arial", 11, "bold"),
+                                                          fg="#2C3E50",
+                                                          bg="#FFFFFF")
+                                info_frame.pack(fill="x", pady=(0, 20))
+                                
+                                # Expected name
+                                expected_frame = tk.Frame(info_frame, bg="#FFFFFF")
+                                expected_frame.pack(fill="x", padx=10, pady=5)
+                                tk.Label(expected_frame, text="Expected Name:", 
+                                        font=("Arial", 10, "bold"), fg="#34495E", 
+                                        bg="#FFFFFF").pack(anchor="w")
+                                tk.Label(expected_frame, text=user_info.get('name', 'N/A'),
+                                        font=("Arial", 10), fg="#27AE60", 
+                                        bg="#FFFFFF").pack(anchor="w", padx=(10, 0))
+                                
+                                # Detected name
+                                detected_frame = tk.Frame(info_frame, bg="#FFFFFF")
+                                detected_frame.pack(fill="x", padx=10, pady=5)
+                                tk.Label(detected_frame, text="License Shows:", 
+                                        font=("Arial", 10, "bold"), fg="#34495E", 
+                                        bg="#FFFFFF").pack(anchor="w")
+                                tk.Label(detected_frame, text=actual_license_name if actual_license_name else 'Not clearly detected',
+                                        font=("Arial", 10), fg="#E74C3C", 
+                                        bg="#FFFFFF").pack(anchor="w", padx=(10, 0))
+                                
+                                # Input section
+                                input_label = tk.Label(main_frame,
+                                                      text="Enter the correct name shown on the license:",
+                                                      font=("Arial", 11, "bold"),
+                                                      fg="#2C3E50",
+                                                      bg="#FFFFFF")
+                                input_label.pack(anchor="w", pady=(0, 5))
+                                
+                                # Entry field
+                                entry_var = tk.StringVar(value=actual_license_name if actual_license_name else "")
+                                entry = tk.Entry(main_frame,
+                                               textvariable=entry_var,
+                                               font=("Arial", 12),
+                                               width=50,
+                                               relief="solid",
+                                               bd=1)
+                                entry.pack(fill="x", pady=(0, 20))
+                                entry.focus_set()
+                                entry.select_range(0, tk.END)
+                                
+                                # Button frame
+                                button_frame = tk.Frame(main_frame, bg="#FFFFFF")
+                                button_frame.pack(fill="x")
+                                
+                                def on_cancel():
+                                    dialog_result.put(None)
+                                    dialog.destroy()
+                                
+                                def on_ok():
+                                    result = entry_var.get().strip()
+                                    dialog_result.put(result)
+                                    dialog.destroy()
+                                
+                                # Buttons
+                                cancel_btn = tk.Button(button_frame,
+                                                     text="Cancel",
+                                                     font=("Arial", 11),
+                                                     bg="#95A5A6",
+                                                     fg="white",
+                                                     padx=25,
+                                                     pady=10,
+                                                     relief="flat",
+                                                     command=on_cancel)
+                                cancel_btn.pack(side="left")
+                                
+                                ok_btn = tk.Button(button_frame,
+                                                  text="Override & Continue",
+                                                  font=("Arial", 11, "bold"),
+                                                  bg="#27AE60",
+                                                  fg="white",
+                                                  padx=25,
+                                                  pady=10,
+                                                  relief="flat",
+                                                  command=on_ok)
+                                ok_btn.pack(side="right")
+                                
+                                # Key bindings
+                                entry.bind('<Return>', lambda e: on_ok())
+                                dialog.bind('<Escape>', lambda e: on_cancel())
+                                dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+                                
+                                # Wait for dialog
+                                dialog.wait_window()
+                                
+                            except Exception as e:
+                                print(f"Dialog creation error: {e}")
+                                dialog_result.put(None)
+                        
+                        # Execute in main thread using the GUI's root window
+                        if hasattr(status_callback, '__self__') and hasattr(status_callback.__self__, 'root'):
+                            # Use the existing GUI root
+                            gui_root = status_callback.__self__.root
+                            gui_root.after(0, show_manual_input_dialog)
+                        else:
+                            # Fallback: create temporary root
+                            temp_root = tk.Tk()
+                            temp_root.withdraw()
+                            temp_root.after(0, show_manual_input_dialog)
+                        
+                        # Wait for result
+                        try:
+                            manual_name = dialog_result.get(timeout=60)  # 1 minute timeout
+                            print(f"🔍 DEBUG: Dialog result: '{manual_name}'")
+                        except queue.Empty:
+                            manual_name = None
+                            print("🔍 DEBUG: Dialog timed out")
+                        
+                        # Process result
+                        manual_attempts = 0
+                        max_manual_attempts = 2
+                        manual_success = False
+                        
+                        while manual_attempts < max_manual_attempts and not manual_success:
+                            manual_attempts += 1
+                            
+                            if manual_name and manual_name.strip():
+                                manual_name = manual_name.strip().title()
+                                expected_name = user_info.get('name', '').title()
+                                
+                                print(f"🔍 DEBUG: Manual attempt {manual_attempts}/{max_manual_attempts}")
+                                print(f"🔍 DEBUG: Manual input: '{manual_name}'")
+                                print(f"🔍 DEBUG: Expected: '{expected_name}'")
+                                
+                                # Check if names match exactly
+                                if manual_name == expected_name:
+                                    print(f"✅ Manual override accepted: Names match exactly")
+                                    manual_success = True
+                                    
+                                    if record_time_in(user_info):
+                                        timestamp = time.strftime('%H:%M:%S')
+                                        status_callback({'current_step': f'✅ TIME IN recorded at {timestamp} (Manual Override)'})
+                                        set_led_success(duration=5.0)
+                                        play_success()
+                                        
+                                        result = {
+                                            'verified': True,
+                                            'name': user_info['name'],
+                                            'time_action': 'IN',
+                                            'timestamp': timestamp,
+                                            'manual_override': True,
+                                            'manual_name': manual_name
+                                        }
+                                        print(f"🎉 SUCCESS: Manual override completed!")
+                                    else:
+                                        status_callback({'current_step': '❌ Failed to record time'})
+                                        set_led_idle()
+                                        play_failure()
+                                        result = {'verified': False, 'reason': 'Failed to record time'}
+                                else:
+                                    # Name doesn't match
+                                    print(f"❌ Manual attempt {manual_attempts} failed: Name doesn't match")
+                                    print(f"   Expected: '{expected_name}'")
+                                    print(f"   Entered:  '{manual_name}'")
+                                    
+                                    if manual_attempts < max_manual_attempts:
+                                        print(f"🔄 Giving second chance... (attempt {manual_attempts + 1}/{max_manual_attempts})")
+                                        
+                                        # Show dialog again for second attempt
+                                        dialog_result.queue.clear()  # Clear previous result
+                                        
+                                        if hasattr(status_callback, '__self__') and hasattr(status_callback.__self__, 'root'):
+                                            gui_root = status_callback.__self__.root
+                                            gui_root.after(0, show_manual_input_dialog)
+                                        else:
+                                            temp_root = tk.Tk()
+                                            temp_root.withdraw()
+                                            temp_root.after(0, show_manual_input_dialog)
+                                        
+                                        # Wait for second attempt
+                                        try:
+                                            manual_name = dialog_result.get(timeout=60)
+                                            print(f"🔍 DEBUG: Second attempt result: '{manual_name}'")
+                                        except queue.Empty:
+                                            manual_name = None
+                                            print("🔍 DEBUG: Second attempt timed out")
+                                            break
+                                    else:
+                                        # Both attempts failed
+                                        status_callback({'current_step': '❌ Manual override failed after 2 attempts'})
+                                        set_led_idle()
+                                        play_failure()
+                                        result = {'verified': False, 'reason': 'Manual override failed - name mismatch after 2 attempts'}
+                            else:
+                                # User cancelled
+                                print(f"❌ Manual attempt {manual_attempts} cancelled")
+                                status_callback({'current_step': '❌ Manual override cancelled'})
+                                set_led_idle()
+                                play_failure()
+                                result = {'verified': False, 'reason': 'Manual override cancelled'}
+                                break
+                    
+                    except Exception as e:
+                        print(f"❌ ERROR in manual override: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        status_callback({'current_step': '❌ Manual override failed'})
+                        set_led_idle()
+                        play_failure()
+                        result = {'verified': False, 'reason': f'Manual override error: {str(e)}'}
+                    
+                    print("🔍 DEBUG: Manual override completed")
     
     finally:
         cleanup_buzzer()
         
     return result
-        
+         
 def check_license_expiration(user_info):
     """Check if license is expired"""
     try:
@@ -371,68 +728,3 @@ def check_license_expiration(user_info):
     except Exception as e:
         print(f"❌ Error checking license expiration: {e}")
         return True  # Error checking, assume valid
-
-def check_admin_fingerprint():
-    """Enhanced admin fingerprint check with retries and better feedback"""
-    from etc.services.fingerprint import finger
-    import adafruit_fingerprint
-    import time
-    
-    print("\n🔐 ADMIN OVERRIDE REQUEST")
-    print("Place ADMIN finger on sensor...")
-    
-    max_attempts = 3
-    
-    for attempt in range(max_attempts):
-        try:
-            print(f"Attempt {attempt + 1}/{max_attempts} - Place finger on sensor...")
-            
-            # Wait for finger
-            timeout = 10  # 10 second timeout per attempt
-            start_time = time.time()
-            
-            while time.time() - start_time < timeout:
-                if finger.get_image() == adafruit_fingerprint.OK:
-                    break
-                time.sleep(0.1)
-            else:
-                print(f"❌ Timeout - No finger detected (attempt {attempt + 1})")
-                if attempt < max_attempts - 1:
-                    continue
-                else:
-                    return False
-            
-            # Convert and search
-            if finger.image_2_tz(1) != adafruit_fingerprint.OK:
-                print(f"❌ Image processing failed (attempt {attempt + 1})")
-                continue
-                
-            result = finger.finger_search()
-            
-            if result == adafruit_fingerprint.OK:
-                if finger.finger_id == 1:  # Admin is always slot 1
-                    print(f"✅ Admin verified! (ID: {finger.finger_id}, Confidence: {finger.confidence})")
-                    return True
-                else:
-                    print(f"❌ Not admin fingerprint (ID: {finger.finger_id})")
-                    if attempt < max_attempts - 1:
-                        print("Try again with admin finger...")
-                        time.sleep(1)
-                        continue
-                    else:
-                        return False
-            else:
-                print(f"❌ Fingerprint not found in database (attempt {attempt + 1})")
-                if attempt < max_attempts - 1:
-                    print("Try again...")
-                    time.sleep(1)
-                    continue
-                    
-        except Exception as e:
-            print(f"❌ Error during admin check (attempt {attempt + 1}): {e}")
-            if attempt < max_attempts - 1:
-                time.sleep(1)
-                continue
-    
-    print("❌ Admin verification failed after all attempts")
-    return False

@@ -302,30 +302,58 @@ def extract_text_from_image(image_path: str, config: str = OCR_CONFIG_STANDARD) 
     return text
 
 def find_best_line_match(input_name: str, ocr_lines: List[str]) -> Tuple[Optional[str], float]:
+    """FIXED: More accurate similarity scoring to prevent false high matches"""
+    if not input_name or not ocr_lines:
+        return None, 0.0
+    
     best_match, best_score = None, 0.0
+    input_name_lower = input_name.lower().strip()
     
     for line in ocr_lines:
         line_clean = line.strip()
-        if not line_clean:
+        if not line_clean or len(line_clean) < 3:  # Skip very short lines
             continue
             
-        score = difflib.SequenceMatcher(None, input_name.lower(), line_clean.lower()).ratio()
+        line_lower = line_clean.lower()
         
-        if input_name.lower() == line_clean.lower():
-            score = 1.0
-        elif (input_name.lower() in line_clean.lower() or line_clean.lower() in input_name.lower()):
-            score = max(score, 0.85)
+        # EXACT MATCH - highest priority
+        if input_name_lower == line_lower:
+            return line_clean, 1.0
         
-        # Word overlap check
-        input_words = set(input_name.lower().split())
-        line_words = set(line_clean.lower().split())
-        word_overlap = len(input_words.intersection(line_words))
-        total_words = len(input_words.union(line_words))
+        # Calculate base similarity using SequenceMatcher
+        base_similarity = difflib.SequenceMatcher(None, input_name_lower, line_lower).ratio()
         
-        if total_words > 0:
-            word_score = word_overlap / total_words
-            score = max(score, word_score)
+        # WORD-BASED MATCHING - more reliable than character matching
+        input_words = set(word.strip() for word in input_name_lower.split() if len(word.strip()) >= 2)
+        line_words = set(word.strip() for word in line_lower.split() if len(word.strip()) >= 2)
         
+        if not input_words:  # Handle edge case
+            score = base_similarity
+        else:
+            # FIXED: Calculate word overlap ratio correctly (intersection / reference words)
+            word_overlap = len(input_words.intersection(line_words))
+            word_overlap_ratio = word_overlap / len(input_words)  # Use reference words as denominator
+            
+            # CONSERVATIVE scoring - be stricter
+            if word_overlap_ratio >= 0.8:  # 80%+ word overlap
+                score = max(0.9, base_similarity)
+            elif word_overlap_ratio >= 0.6:  # 60%+ word overlap  
+                score = max(0.75, base_similarity)
+            elif word_overlap_ratio >= 0.4:  # 40%+ word overlap
+                score = max(0.6, base_similarity)
+            else:
+                # Low word overlap - use base similarity but cap it
+                score = min(base_similarity, 0.5)  # Cap low overlap matches
+        
+        # FIXED: Much more conservative substring matching
+        # Only boost if we have significant substring match AND decent base similarity
+        if base_similarity >= 0.4:  # Only if there's already reasonable similarity
+            if (len(input_name_lower) >= 10 and input_name_lower in line_lower) or \
+               (len(line_lower) >= 10 and line_lower in input_name_lower):
+                # Only small boost for substring matches, and cap the result
+                score = min(score + 0.1, 0.8)  # Cap at 80% for substring matches
+        
+        # Update best match if this is better
         if score > best_score:
             best_score = score
             best_match = line_clean
@@ -1081,75 +1109,53 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
 # ============== VERIFICATION FUNCTIONS ==============
 
 def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
+    """License reading without retake loop - single attempt only"""
     reference_name = fingerprint_info['name']
-    current_image_path = image_path
     
     try:
-        while True:
-            try:
-                basic_text = extract_text_from_image(current_image_path)
-            except ValueError as e:
-                if "STUDENT_PERMIT_DETECTED" in str(e):
-                    # Return error result for Student Permit
-                    error_packaged = package_name_info(
-                        {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
-                        "Student Permit detected - Access denied", fingerprint_info
-                    )
-                    error_packaged.match_score = 0.0
-                    return error_packaged
-                else:
-                    raise e
-            
-            ocr_lines = [line.strip() for line in basic_text.splitlines() if line.strip()]
-            name_from_ocr, sim_score = find_best_line_match(reference_name, ocr_lines)
-            
-            try:
-                structured_data = extract_name_from_lines(current_image_path, reference_name, name_from_ocr, sim_score)
-            except ValueError as e:
-                if "STUDENT_PERMIT_DETECTED" in str(e):
-                    # Return error result for Student Permit
-                    error_packaged = package_name_info(
-                        {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
-                        "Student Permit detected - Access denied", fingerprint_info
-                    )
-                    error_packaged.match_score = 0.0
-                    return error_packaged
-                else:
-                    raise e
-            
-            packaged = package_name_info(structured_data, basic_text, fingerprint_info)
-            packaged.match_score = sim_score
-            
-            detected_name = packaged.name
-            
-            # Check name matching
-            exact_match = (detected_name.lower() == reference_name.lower())
-            high_similarity = sim_score and sim_score >= 0.65
-            
-            ref_words = set(reference_name.lower().split())
-            det_words = set(detected_name.lower().split())
-            word_overlap_ratio = len(ref_words.intersection(det_words)) / len(ref_words) if ref_words else 0
-            substantial_overlap = word_overlap_ratio >= 0.7
-            
-            name_matches = (detected_name != "Not Found" and (exact_match or high_similarity or substantial_overlap))
-            
-            if name_matches:
-                return packaged
-            
-            if not _retake_prompt(reference_name, detected_name):
-                return packaged
-            
-            if current_image_path != image_path:
-                safe_delete_temp_file(current_image_path)
-            
-            retake_image_path = auto_capture_license_rpi(reference_name, fingerprint_info, retry_mode=True)
-            
-            if retake_image_path:
-                current_image_path = retake_image_path
+        # Extract text from image
+        try:
+            basic_text = extract_text_from_image(image_path)
+        except ValueError as e:
+            if "STUDENT_PERMIT_DETECTED" in str(e):
+                # Return error result for Student Permit
+                error_packaged = package_name_info(
+                    {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
+                    "Student Permit detected - Access denied", fingerprint_info
+                )
+                error_packaged.match_score = 0.0
+                return error_packaged
             else:
-                return packaged
+                raise e
         
-    except Exception:
+        # Find best matching line
+        ocr_lines = [line.strip() for line in basic_text.splitlines() if line.strip()]
+        name_from_ocr, sim_score = find_best_line_match(reference_name, ocr_lines)
+        
+        # Extract structured name data
+        try:
+            structured_data = extract_name_from_lines(image_path, reference_name, name_from_ocr, sim_score)
+        except ValueError as e:
+            if "STUDENT_PERMIT_DETECTED" in str(e):
+                # Return error result for Student Permit
+                error_packaged = package_name_info(
+                    {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"}, 
+                    "Student Permit detected - Access denied", fingerprint_info
+                )
+                error_packaged.match_score = 0.0
+                return error_packaged
+            else:
+                raise e
+        
+        # Package the result
+        packaged = package_name_info(structured_data, basic_text, fingerprint_info)
+        packaged.match_score = sim_score
+        
+        # REMOVED: No more retake loop - just return the result
+        return packaged
+        
+    except Exception as e:
+        print(f"❌ Error in licenseRead: {e}")
         error_packaged = package_name_info(
             {"Name": "Not Found", "Document Verified": "Failed"}, 
             "Processing failed", fingerprint_info
@@ -1157,10 +1163,9 @@ def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
         error_packaged.match_score = 0.0
         return error_packaged
     finally:
-        if current_image_path != image_path:
-            safe_delete_temp_file(current_image_path)
+        # Clean up the image file
         safe_delete_temp_file(image_path)
-
+        
 def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
     """Updated licenseReadGuest function with proper GUI integration"""
     reference_name = guest_info['name']  # Use guest name as reference
