@@ -16,6 +16,7 @@ from database.db_operations import (
 
 from etc.utils.display_helpers import display_separator, display_verification_result
 from etc.utils.gui_helpers import show_results_gui
+from etc.ui.dialog_helpers_gui import get_manual_name_input
 
 import time
 from datetime import datetime
@@ -37,7 +38,7 @@ def student_verification():
     gui.run()
 
 def run_verification_with_gui(status_callback):
-    """Run verification steps with GUI status updates - COMPLETE VERSION"""
+    """Run verification steps with GUI status updates"""
     
     # Initialize systems
     init_buzzer()
@@ -85,7 +86,7 @@ def run_verification_with_gui(status_callback):
         status_callback({'fingerprint_status': 'VERIFIED'})
         status_callback({'user_info': user_info})
         
-        # FIXED: Check current status with correct user_id
+        # Check current status with correct user_id
         user_id = user_info.get('unified_id', user_info.get('student_id', ''))
         current_status = get_student_time_status(user_id)
         
@@ -179,14 +180,14 @@ def run_verification_with_gui(status_callback):
             from etc.services.license_reader import _count_verification_keywords, extract_text_from_image, _detect_name_pattern
             license_success = False
             image_path = None
-            actual_license_name = None  # Track detected name across attempts
+            actual_license_name = None
             
             for attempt in range(2):  # Try twice
                 print(f"\n📷 License attempt {attempt + 1}/2")
                 
-                # FIXED: Create proper fingerprint_info structure for license verification
+                # Create proper fingerprint_info structure for license verification
                 fingerprint_info = {
-                    'name': user_info.get('name', ''),  # This is the reference name from fingerprint
+                    'name': user_info.get('name', ''),
                     'confidence': user_info.get('confidence', 100),
                     'user_type': user_info.get('user_type', 'STUDENT'),
                     'finger_id': user_info.get('finger_id', 'N/A')
@@ -194,7 +195,7 @@ def run_verification_with_gui(status_callback):
                 
                 image_path = auto_capture_license_rpi(
                     reference_name=user_info.get('name', ''),
-                    fingerprint_info=fingerprint_info  # Pass properly formatted fingerprint_info
+                    fingerprint_info=fingerprint_info
                 )
                 
                 if image_path:
@@ -214,23 +215,22 @@ def run_verification_with_gui(status_callback):
                     
                     keywords_found = _count_verification_keywords(ocr_text)
                     
-                    # OPTIMIZED: Get the actual name on the license (like guest flow)
+                    # Get the actual name on the license
                     ocr_lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
                     actual_license_name = _detect_name_pattern(ocr_text)
                     
-                    # NEW: Clear terminal output showing actual vs expected names
+                    # Show scan results
                     print(f"\n📋 LICENSE SCAN RESULTS (Attempt {attempt + 1}/2):")
                     print(f"🎯 Expected Name: '{user_info.get('name', 'N/A')}'")
                     print(f"🔍 License Holder: '{actual_license_name if actual_license_name else 'NOT FOUND'}'")
                     print(f"📄 Keywords Found: {keywords_found}")
                     
-                    # Check if names match (basic comparison)
+                    # Check if names match
                     name_matches = False
                     name_found = actual_license_name is not None and actual_license_name.strip() != ""
                     similarity_score = 0.0
                     
                     if actual_license_name and user_info.get('name'):
-                        # Calculate similarity directly
                         import difflib
                         similarity_score = difflib.SequenceMatcher(
                             None, 
@@ -238,32 +238,26 @@ def run_verification_with_gui(status_callback):
                             user_info.get('name', '').lower().strip()
                         ).ratio()
                         
-                        # Consider it a match if very high similarity (90%+) or exact match
                         if similarity_score >= 0.9:
                             name_matches = True
                             print(f"✅ STRONG MATCH: {similarity_score*100:.1f}% similarity")
                         else:
                             print(f"⚠️ NAME MISMATCH: {similarity_score*100:.1f}% similarity")
-                            print(f"   Expected: {user_info.get('name', '')}")
-                            print(f"   License:  {actual_license_name}")
                     elif not name_found:
                         print(f"❌ NO NAME DETECTED: Could not extract name from license")
                     
-                    # SUCCESS CONDITIONS: Name match overrides keyword requirement
+                    # SUCCESS CONDITIONS
                     has_good_keywords = keywords_found >= 3
                     has_some_keywords = keywords_found >= 1
                     perfect_conditions = has_some_keywords and name_found and name_matches
                     
                     if perfect_conditions:
-                        # SUCCESS: Name matches (even with few keywords)
                         print(f"✅ License accepted: Strong name match ({similarity_score*100:.1f}%) overrides keyword requirement")
-                        print(f"🎯 SUCCESS: Name match confirmed with {keywords_found} keywords")
                         license_success = True
                         break
                     
                     # AUTO-RETRY CONDITIONS (First attempt)
                     elif attempt == 0:
-                        # Retry for ANY imperfect condition
                         retry_reasons = []
                         if not has_some_keywords:
                             retry_reasons.append(f"only {keywords_found} keywords (need at least 1)")
@@ -282,25 +276,12 @@ def run_verification_with_gui(status_callback):
                         if has_some_keywords and name_found:
                             if name_matches:
                                 print(f"✅ License accepted: Name match ({similarity_score*100:.1f}%) + {keywords_found} keywords (2nd attempt)")
-                                print(f"🎯 SUCCESS: Name confirmed on second attempt")
                             else:
                                 print(f"✅ License accepted: {keywords_found} keywords + name detected (2nd attempt)")
-                                print(f"📄 SUCCESS: Valid license detected (name verification in next stage)")
                             license_success = True
                             break
                         else:
-                            # Still not good enough after 2 attempts
-                            print(f"⚠️ SECOND ATTEMPT FAILED:")
-                            if not has_some_keywords and not name_found:
-                                print(f"   - Only {keywords_found} keywords (need at least 1)")
-                                print(f"   - No name detected")
-                            elif not has_some_keywords:
-                                print(f"   - Only {keywords_found} keywords (need at least 1)")
-                            elif not name_found:
-                                print(f"   - Name detection failed")
-                            
-                            print("❌ Both automatic attempts failed")
-                            # Will offer manual input after the loop
+                            print(f"⚠️ SECOND ATTEMPT FAILED")
                         
                 else:
                     # Camera capture failed 
@@ -312,15 +293,12 @@ def run_verification_with_gui(status_callback):
                         play_failure()
                         cleanup_buzzer()
                         return {'verified': False, 'reason': 'Student Driver License not allowed'}
-                    # Second attempt camera failure continues to manual input
 
-            # ENHANCED: Manual input option after 2 failed attempts
+            # Handle manual input if both attempts failed
             if not license_success:
-                # Check if we have ANY valid license data from either attempt
-                last_attempt_had_keywords = keywords_found >= 1  # At least 1 keyword indicates a license
+                last_attempt_had_keywords = keywords_found >= 1
                 
                 if last_attempt_had_keywords:
-                    # We detected a license but quality was poor - offer manual input
                     print(f"\n🤔 MANUAL INPUT OPTION:")
                     print(f"   License detected but scan quality insufficient")
                     print(f"   Expected: {user_info.get('name', 'N/A')}")
@@ -377,7 +355,6 @@ def run_verification_with_gui(status_callback):
                         cleanup_buzzer()
                         return {'verified': False, 'reason': 'Manual input declined'}
                 else:
-                    # No license detected at all - just fail
                     print("❌ No valid license detected in either attempt")
                     cleanup_buzzer()
                     return {'verified': False, 'reason': 'No valid license detected'}
@@ -386,11 +363,10 @@ def run_verification_with_gui(status_callback):
             if license_success and image_path:
                 status_callback({'current_step': '🔍 Verifying license against fingerprint...'})
                 
-                # FIXED: Pass the properly formatted fingerprint_info
                 try:
                     verification_result = complete_verification_flow(
                         image_path=image_path,
-                        fingerprint_info=fingerprint_info,  # Use the properly formatted fingerprint_info
+                        fingerprint_info=fingerprint_info,
                         helmet_verified=True,
                         license_expiration_valid=license_expiration_valid
                     )
@@ -441,168 +417,7 @@ def run_verification_with_gui(status_callback):
                     if actual_license_name:
                         print(f"   License shows: {actual_license_name}")
                     
-                    print("🔍 DEBUG: Creating professional manual input dialog...")
-                    
                     try:
-                        # Thread-safe manual input dialog
-                        import tkinter as tk
-                        from tkinter import messagebox
-                        import queue
-                        import threading
-                        
-                        # Create result queue
-                        dialog_result = queue.Queue()
-                        
-                        def show_manual_input_dialog():
-                            """Create a professional manual input dialog in main thread"""
-                            try:
-                                # Create new toplevel window
-                                dialog = tk.Toplevel()
-                                dialog.title("Manual Name Override Required")
-                                dialog.geometry("500x350")
-                                dialog.configure(bg="#FFFFFF")
-                                dialog.resizable(False, False)
-                                
-                                # Center window
-                                dialog.update_idletasks()
-                                x = (dialog.winfo_screenwidth() // 2) - (250)
-                                y = (dialog.winfo_screenheight() // 2) - (175)
-                                dialog.geometry(f"500x350+{x}+{y}")
-                                
-                                # Make modal and topmost
-                                dialog.transient()
-                                dialog.grab_set()
-                                dialog.attributes('-topmost', True)
-                                dialog.focus_force()
-                                
-                                # Create content
-                                main_frame = tk.Frame(dialog, bg="#FFFFFF", padx=20, pady=20)
-                                main_frame.pack(fill="both", expand=True)
-                                
-                                # Title
-                                title_label = tk.Label(main_frame,
-                                                      text="⚠️ Manual Override Required",
-                                                      font=("Arial", 16, "bold"),
-                                                      fg="#E74C3C",
-                                                      bg="#FFFFFF")
-                                title_label.pack(pady=(0, 15))
-                                
-                                # Info frame
-                                info_frame = tk.LabelFrame(main_frame, 
-                                                          text=" Verification Details ",
-                                                          font=("Arial", 11, "bold"),
-                                                          fg="#2C3E50",
-                                                          bg="#FFFFFF")
-                                info_frame.pack(fill="x", pady=(0, 20))
-                                
-                                # Expected name
-                                expected_frame = tk.Frame(info_frame, bg="#FFFFFF")
-                                expected_frame.pack(fill="x", padx=10, pady=5)
-                                tk.Label(expected_frame, text="Expected Name:", 
-                                        font=("Arial", 10, "bold"), fg="#34495E", 
-                                        bg="#FFFFFF").pack(anchor="w")
-                                tk.Label(expected_frame, text=user_info.get('name', 'N/A'),
-                                        font=("Arial", 10), fg="#27AE60", 
-                                        bg="#FFFFFF").pack(anchor="w", padx=(10, 0))
-                                
-                                # Detected name
-                                detected_frame = tk.Frame(info_frame, bg="#FFFFFF")
-                                detected_frame.pack(fill="x", padx=10, pady=5)
-                                tk.Label(detected_frame, text="License Shows:", 
-                                        font=("Arial", 10, "bold"), fg="#34495E", 
-                                        bg="#FFFFFF").pack(anchor="w")
-                                tk.Label(detected_frame, text=actual_license_name if actual_license_name else 'Not clearly detected',
-                                        font=("Arial", 10), fg="#E74C3C", 
-                                        bg="#FFFFFF").pack(anchor="w", padx=(10, 0))
-                                
-                                # Input section
-                                input_label = tk.Label(main_frame,
-                                                      text="Enter the correct name shown on the license:",
-                                                      font=("Arial", 11, "bold"),
-                                                      fg="#2C3E50",
-                                                      bg="#FFFFFF")
-                                input_label.pack(anchor="w", pady=(0, 5))
-                                
-                                # Entry field
-                                entry_var = tk.StringVar(value=actual_license_name if actual_license_name else "")
-                                entry = tk.Entry(main_frame,
-                                               textvariable=entry_var,
-                                               font=("Arial", 12),
-                                               width=50,
-                                               relief="solid",
-                                               bd=1)
-                                entry.pack(fill="x", pady=(0, 20))
-                                entry.focus_set()
-                                entry.select_range(0, tk.END)
-                                
-                                # Button frame
-                                button_frame = tk.Frame(main_frame, bg="#FFFFFF")
-                                button_frame.pack(fill="x")
-                                
-                                def on_cancel():
-                                    dialog_result.put(None)
-                                    dialog.destroy()
-                                
-                                def on_ok():
-                                    result = entry_var.get().strip()
-                                    dialog_result.put(result)
-                                    dialog.destroy()
-                                
-                                # Buttons
-                                cancel_btn = tk.Button(button_frame,
-                                                     text="Cancel",
-                                                     font=("Arial", 11),
-                                                     bg="#95A5A6",
-                                                     fg="white",
-                                                     padx=25,
-                                                     pady=10,
-                                                     relief="flat",
-                                                     command=on_cancel)
-                                cancel_btn.pack(side="left")
-                                
-                                ok_btn = tk.Button(button_frame,
-                                                  text="Override & Continue",
-                                                  font=("Arial", 11, "bold"),
-                                                  bg="#27AE60",
-                                                  fg="white",
-                                                  padx=25,
-                                                  pady=10,
-                                                  relief="flat",
-                                                  command=on_ok)
-                                ok_btn.pack(side="right")
-                                
-                                # Key bindings
-                                entry.bind('<Return>', lambda e: on_ok())
-                                dialog.bind('<Escape>', lambda e: on_cancel())
-                                dialog.protocol("WM_DELETE_WINDOW", on_cancel)
-                                
-                                # Wait for dialog
-                                dialog.wait_window()
-                                
-                            except Exception as e:
-                                print(f"Dialog creation error: {e}")
-                                dialog_result.put(None)
-                        
-                        # Execute in main thread using the GUI's root window
-                        if hasattr(status_callback, '__self__') and hasattr(status_callback.__self__, 'root'):
-                            # Use the existing GUI root
-                            gui_root = status_callback.__self__.root
-                            gui_root.after(0, show_manual_input_dialog)
-                        else:
-                            # Fallback: create temporary root
-                            temp_root = tk.Tk()
-                            temp_root.withdraw()
-                            temp_root.after(0, show_manual_input_dialog)
-                        
-                        # Wait for result
-                        try:
-                            manual_name = dialog_result.get(timeout=60)  # 1 minute timeout
-                            print(f"🔍 DEBUG: Dialog result: '{manual_name}'")
-                        except queue.Empty:
-                            manual_name = None
-                            print("🔍 DEBUG: Dialog timed out")
-                        
-                        # Process result
                         manual_attempts = 0
                         max_manual_attempts = 2
                         manual_success = False
@@ -610,13 +425,16 @@ def run_verification_with_gui(status_callback):
                         while manual_attempts < max_manual_attempts and not manual_success:
                             manual_attempts += 1
                             
+                            # Use the new dialog helper
+                            manual_name = get_manual_name_input(
+                                user_info.get('name', 'N/A'),
+                                actual_license_name,
+                                status_callback
+                            )
+                            
                             if manual_name and manual_name.strip():
                                 manual_name = manual_name.strip().title()
                                 expected_name = user_info.get('name', '').title()
-                                
-                                print(f"🔍 DEBUG: Manual attempt {manual_attempts}/{max_manual_attempts}")
-                                print(f"🔍 DEBUG: Manual input: '{manual_name}'")
-                                print(f"🔍 DEBUG: Expected: '{expected_name}'")
                                 
                                 # Check if names match exactly
                                 if manual_name == expected_name:
@@ -637,7 +455,6 @@ def run_verification_with_gui(status_callback):
                                             'manual_override': True,
                                             'manual_name': manual_name
                                         }
-                                        print(f"🎉 SUCCESS: Manual override completed!")
                                     else:
                                         status_callback({'current_step': '❌ Failed to record time'})
                                         set_led_idle()
@@ -646,33 +463,8 @@ def run_verification_with_gui(status_callback):
                                 else:
                                     # Name doesn't match
                                     print(f"❌ Manual attempt {manual_attempts} failed: Name doesn't match")
-                                    print(f"   Expected: '{expected_name}'")
-                                    print(f"   Entered:  '{manual_name}'")
                                     
-                                    if manual_attempts < max_manual_attempts:
-                                        print(f"🔄 Giving second chance... (attempt {manual_attempts + 1}/{max_manual_attempts})")
-                                        
-                                        # Show dialog again for second attempt
-                                        dialog_result.queue.clear()  # Clear previous result
-                                        
-                                        if hasattr(status_callback, '__self__') and hasattr(status_callback.__self__, 'root'):
-                                            gui_root = status_callback.__self__.root
-                                            gui_root.after(0, show_manual_input_dialog)
-                                        else:
-                                            temp_root = tk.Tk()
-                                            temp_root.withdraw()
-                                            temp_root.after(0, show_manual_input_dialog)
-                                        
-                                        # Wait for second attempt
-                                        try:
-                                            manual_name = dialog_result.get(timeout=60)
-                                            print(f"🔍 DEBUG: Second attempt result: '{manual_name}'")
-                                        except queue.Empty:
-                                            manual_name = None
-                                            print("🔍 DEBUG: Second attempt timed out")
-                                            break
-                                    else:
-                                        # Both attempts failed
+                                    if manual_attempts >= max_manual_attempts:
                                         status_callback({'current_step': '❌ Manual override failed after 2 attempts'})
                                         set_led_idle()
                                         play_failure()
@@ -688,14 +480,10 @@ def run_verification_with_gui(status_callback):
                     
                     except Exception as e:
                         print(f"❌ ERROR in manual override: {e}")
-                        import traceback
-                        traceback.print_exc()
                         status_callback({'current_step': '❌ Manual override failed'})
                         set_led_idle()
                         play_failure()
                         result = {'verified': False, 'reason': f'Manual override error: {str(e)}'}
-                    
-                    print("🔍 DEBUG: Manual override completed")
     
     finally:
         cleanup_buzzer()
