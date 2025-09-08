@@ -441,14 +441,64 @@ def show_success_gui(title, message, image=None, details=None):
 
 def show_message_gui(message, title="MotorPass", message_type="info"):
     """Show a message in a GUI dialog"""
+    from tkinter import messagebox
+    import tkinter as tk
+    
+    # Get screen dimensions
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.destroy()
+    
+    # Create custom dialog for better sizing
+    dialog = tk.Toplevel()
+    dialog.title(title)
+    
+    # Simple responsive sizing
+    dialog_width = max(300, int(screen_width * 0.2))
+    dialog_height = max(150, int(screen_height * 0.15))
+    
+    # Center the dialog
+    x = (screen_width - dialog_width) // 2
+    y = (screen_height - dialog_height) // 2
+    dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+    
+    dialog.configure(bg="#FFFFFF")
+    dialog.resizable(False, False)
+    dialog.grab_set()
+    dialog.attributes('-topmost', True)
+    
+    # Simple content
+    main_frame = tk.Frame(dialog, bg="#FFFFFF")
+    main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+    
+    # Message with responsive font
+    font_size = max(10, int(screen_width / 120))
+    
     if message_type.lower() == "error":
-        messagebox.showerror(title, message)
+        icon_text = "❌ ERROR"
+        color = "#DC3545"
     elif message_type.lower() == "warning":
-        messagebox.showwarning(title, message)
+        icon_text = "⚠️ WARNING"
+        color = "#FFC107"
     elif message_type.lower() == "success":
-        messagebox.showinfo(title, f"✅ {message}")
+        icon_text = "✅ SUCCESS"
+        color = "#28A745"
     else:
-        messagebox.showinfo(title, message)
+        icon_text = "ℹ️ INFO"
+        color = "#007BFF"
+    
+    tk.Label(main_frame, text=icon_text, font=("Arial", font_size + 2, "bold"), 
+             fg=color, bg="#FFFFFF").pack(pady=(0, 10))
+    
+    tk.Label(main_frame, text=message, font=("Arial", font_size), 
+             fg="#333333", bg="#FFFFFF", wraplength=dialog_width-40, justify="center").pack(pady=(0, 15))
+    
+    tk.Button(main_frame, text="OK", font=("Arial", font_size), 
+              bg=color, fg="white", command=dialog.destroy, width=8).pack()
+    
+    dialog.wait_window()
 
 def get_user_input_gui(prompt, title="Input Required", default_value=""):
     """

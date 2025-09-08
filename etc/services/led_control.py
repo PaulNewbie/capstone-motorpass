@@ -99,12 +99,17 @@ class LEDController:
             GPIO.output(self.red_pin, GPIO.LOW)
             GPIO.output(self.green_pin, GPIO.LOW)
         
-        # Auto-return to idle after duration
+        # Auto-return to idle after duration - FIX THE THREAD BUG
         if duration and state != LEDState.IDLE:
             def auto_return():
-                time.sleep(duration)
-                if self.current_state == state:  # Only return if state hasn't changed
-                    self.set_state(LEDState.IDLE)
+                try:
+                    time.sleep(duration)
+                    # Check if controller still exists and state hasn't changed
+                    if hasattr(self, 'current_state') and self.current_state == state:
+                        self.set_state(LEDState.IDLE)
+                except Exception as e:
+                    # Silently handle cleanup errors (controller was cleaned up)
+                    pass
             
             threading.Thread(target=auto_return, daemon=True).start()
     
