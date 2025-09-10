@@ -6,19 +6,6 @@ from database.vip_operations import (
     check_vip_status
 )
 
-def authenticate_admin_for_vip():
-    """Authenticate admin fingerprint for VIP access"""
-    try:
-        from etc.controllers.admin import authenticate_admin
-        
-        print("\n🔐 ADMIN AUTHENTICATION REQUIRED FOR VIP ACCESS")
-        print("Please place finger on sensor...")
-        
-        return authenticate_admin()
-    except Exception as e:
-        print(f"❌ VIP Authentication error: {e}")
-        return False
-
 def determine_vip_action(plate_number):
     """Determine if plate number should TIME IN or TIME OUT"""
     try:

@@ -73,9 +73,11 @@ class SimpleRefreshManager:
             print(f"  ⚠️ Hardware cleanup: {e}")
             
     def _clear_temp_files(self):
-        """Remove temporary files"""
         try:
-            patterns = ["temp_*.jpg", "temp_*.png", "license_*.jpg"]
+            patterns = [
+                "temp_*.jpg", "temp_*.png", "license_*.jpg", 
+                "captured_*.jpg", "helmet_*.jpg", "*.tmp"
+            ]
             count = 0
             
             for pattern in patterns:
@@ -93,36 +95,45 @@ class SimpleRefreshManager:
             print(f"  ⚠️ File cleanup: {e}")
             
     def _reset_forms(self):
-        """Reset form inputs"""
+        """Enhanced form reset - better widget detection"""
         try:
-            # Find all tkinter windows and reset their widgets
+            reset_count = 0
+            
             for widget in self._get_all_widgets():
                 try:
                     # Clear text inputs
                     if isinstance(widget, tk.Entry):
                         widget.delete(0, tk.END)
+                        reset_count += 1
                         
                     # Clear text areas
                     elif isinstance(widget, tk.Text):
                         widget.delete(1.0, tk.END)
+                        reset_count += 1
                         
-                    # Reset selections
+                    # Reset string variables  
                     elif hasattr(widget, 'set') and hasattr(widget, 'get'):
-                        widget.set("")
+                        try:
+                            widget.set("")
+                            reset_count += 1
+                        except:
+                            pass
                         
-                    # Reset button colors
+                    # Reset office selection buttons (improved detection)
                     elif isinstance(widget, tk.Button):
                         try:
-                            # Reset office selection buttons to default
-                            if widget.cget('bg') == "#4CAF50":  # Selected button
+                            current_bg = widget.cget('bg')
+                            # Reset selected office buttons
+                            if current_bg in ["#4CAF50", "#27AE60"]:  # Selected colors
                                 widget.config(bg="#f0f0f0", fg="black")
+                                reset_count += 1
                         except:
                             pass
                             
                 except:
                     pass
                     
-            print("  ✅ Forms reset")
+            print(f"  ✅ Reset {reset_count} form elements")
             
         except Exception as e:
             print(f"  ⚠️ Form reset: {e}")
@@ -189,19 +200,7 @@ def auto_setup_refresh():
         pass
 
 """
-SIMPLE USAGE:
-
-1. In any GUI file, add this at the top:
-   from simple_refresh import add_refresh_to_window
-
-2. In your GUI __init__ method, after creating the window:
-   add_refresh_to_window(self.root)
-
-3. Optionally add a refresh button:
-   from simple_refresh import manual_refresh
-   tk.Button(frame, text="🔄 Refresh", command=manual_refresh)
-
-That's it! Press F5 or click the button to refresh.
+Press F5 or click the button to refresh.
 
 WHAT IT DOES:
 - Clears all form inputs and selections

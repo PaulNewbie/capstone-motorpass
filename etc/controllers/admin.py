@@ -147,41 +147,6 @@ def enroll_admin_fingerprint():
         print("❌ Storage failed")
         return False
 
-def authenticate_admin():
-    """Authenticate admin using fingerprint"""
-    print("\n🔐 ADMIN AUTHENTICATION")
-    print("👆 Place admin finger on sensor...")
-    
-    # Wait for finger and process
-    while finger.get_image() != adafruit_fingerprint.OK:
-        print(".", end="")
-        time.sleep(0.1)
-    
-    print("\n🔄 Processing...")
-    if finger.image_2_tz(1) != adafruit_fingerprint.OK:
-        print("❌ Failed to process")
-        return False
-    
-    print("🔍 Searching...")
-    if finger.finger_search() != adafruit_fingerprint.OK:
-        print("❌ No match found")
-        return False
-    
-    # Check if matched fingerprint is admin (slot 1)
-    if finger.finger_id == 1:
-        try:
-            admin_db = load_admin_database()
-            admin_name = admin_db.get("1", {}).get("name", "Admin User")
-        except:
-            admin_name = "Admin User"
-        
-        print(f"✅ Welcome Admin: {admin_name}")
-        print(f"🎯 Confidence: {finger.confidence}")
-        return True
-    else:
-        print("❌ Not an admin fingerprint")
-        return False
-
 # =================== ADMIN FUNCTIONS ===================
 def admin_enroll():
     """Enroll new user (student or staff)"""
@@ -521,14 +486,14 @@ def admin_panel(main_window=None):
             return
         print("✅ Super admin setup complete!")
     
-    # Role-based authentication
+    # Role-based authentication - PASS main_window to show fingerprint GUI on top of background
     print("\n🔐 Opening authentication...")
     
     try:
         from etc.services.fingerprint import authenticate_admin_with_role
         
-        # Authenticate and get role
-        user_role = authenticate_admin_with_role()
+        # Pass main_window so fingerprint GUI appears on top of background
+        user_role = authenticate_admin_with_role(main_window=main_window)
         
         if not user_role:
             print("❌ Authentication failed!")
@@ -540,11 +505,12 @@ def admin_panel(main_window=None):
         print(f"❌ Authentication Error: {e}")
         return
     
-    # Hide main window if provided
+    # NOW hide main window after successful authentication
+    '''
     if main_window:
         print("🔄 Hiding main window...")
         main_window.withdraw()
-    
+    '''
     try:
         from etc.ui.admin_gui import AdminPanelGUI
         
@@ -561,7 +527,7 @@ def admin_panel(main_window=None):
             'reset': admin_reset_all
         }
         
-        # Create admin panel with role
+        # Create admin panel with role (fullscreen)
         gui = AdminPanelGUI(admin_functions, skip_auth=True, user_role=user_role)
         gui.run()
         

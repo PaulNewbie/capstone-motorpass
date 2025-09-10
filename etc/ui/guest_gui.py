@@ -8,10 +8,8 @@ import os
 from PIL import Image, ImageTk
 import queue
 
-try:
-    from refresh import add_refresh_to_window
-except ImportError:
-    add_refresh_to_window = None
+from refresh import add_refresh_to_window
+
 
 class GuestVerificationGUI:
     def __init__(self, verification_function):
@@ -19,6 +17,8 @@ class GuestVerificationGUI:
         self.verification_function = verification_function
         self.verification_complete = False  # Initialize BEFORE other methods
         self.setup_window()
+        if add_refresh_to_window:
+            add_refresh_to_window(self.root)
         self.create_variables()
         self.create_interface()
         
@@ -59,7 +59,6 @@ class GuestVerificationGUI:
         self.root.bind('<F11>', self.toggle_fullscreen)
         # Bind Ctrl+C for emergency abort
         self.root.bind('<Control-c>', self.emergency_abort)
-        add_refresh_to_window(self.root)
         
     def toggle_fullscreen(self, event=None):
         """Toggle fullscreen mode - useful for admin access or testing"""

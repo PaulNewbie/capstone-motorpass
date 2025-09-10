@@ -10,10 +10,9 @@ from typing import Dict
 import sys
 import queue
 
-try:
-    from refresh import add_refresh_to_window
-except ImportError:
-    add_refresh_to_window = None
+
+from refresh import add_refresh_to_window
+
 
 class StudentVerificationGUI:
     def __init__(self, verification_function):
@@ -21,6 +20,8 @@ class StudentVerificationGUI:
         self.verification_function = verification_function
         self.verification_complete = False  # Initialize BEFORE other methods
         self.setup_window()
+        if add_refresh_to_window:
+            add_refresh_to_window(self.root)
         self.create_variables()
         self.create_interface()
         
@@ -61,7 +62,6 @@ class StudentVerificationGUI:
         self.root.bind('<Escape>', self.toggle_fullscreen_and_close)
         # Also bind F11 for fullscreen toggle
         self.root.bind('<F11>', self.toggle_fullscreen)
-        add_refresh_to_window(self.root)
         
     def toggle_fullscreen(self, event=None):
         """Toggle fullscreen mode - useful for admin access or testing"""

@@ -27,6 +27,13 @@ def show_manual_input_dialog(expected_name, actual_license_name, dialog_result_q
         dialog.attributes('-topmost', True)
         dialog.focus_force()
         
+        try:
+            from refresh import add_refresh_to_window
+            if add_refresh_to_window:
+                add_refresh_to_window(dialog)
+        except ImportError:
+            add_refresh_to_window = None
+        
         # Create content
         main_frame = tk.Frame(dialog, bg="#FFFFFF", padx=20, pady=20)
         main_frame.pack(fill="both", expand=True)
