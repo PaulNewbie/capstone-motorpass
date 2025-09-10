@@ -24,13 +24,13 @@ class AdminFingerprintGUI:
         # Use overrideredirect to prevent window manager interference
         self.root.overrideredirect(True)
         
-        # Force parent window to stay visible and ensure stacking order
+        # Keep parent window visible and ensure stacking order
         if parent_window:
             parent_window.attributes('-topmost', False)  # Remove topmost if set
             parent_window.deiconify()  # Ensure parent is visible
             parent_window.update()     # Force update
         
-        # Center window on top of parent
+        # Center window PROPERLY - fix the positioning issue
         self.center_window()
         
         # Set this window on top but not topmost
@@ -41,13 +41,27 @@ class AdminFingerprintGUI:
         self.create_widgets()
     
     def center_window(self):
-        """Center the window on screen"""
+        """Center the window on screen - FIXED"""
+        # First update to get correct dimensions
         self.root.update_idletasks()
-        width = self.root.winfo_width()
-        height = self.root.winfo_height()
-        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        
+        # Get window dimensions
+        width = 350  # Use fixed width since geometry is set
+        height = 250  # Use fixed height since geometry is set
+        
+        # Get screen dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calculate center position
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        
+        # Set the geometry with proper positioning
         self.root.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Force update to apply positioning
+        self.root.update()
     
     def create_widgets(self):
         """Create admin authentication widgets"""
@@ -87,35 +101,43 @@ class AdminFingerprintGUI:
         self.status_label.config(text=message, fg=color)
     
     def show_success(self):
-        """Show success message"""
+        """Show success message with delayed main window hiding"""
         self.update_status("✅ Admin authenticated!", "#27ae60")
         self.message_label.config(text="Welcome Admin!\nAccess Granted", fg="#27ae60")
         self.cancel_btn.config(text="Continue", bg="#27ae60")
         self.auth_result = True
         
+        # Show success message for 2 seconds FIRST
+        self.root.after(3000, self.hide_main_window_and_close)
+    
+    def hide_main_window_and_close(self):
+        """Hide main window and close authentication dialog"""
+        # NOW hide the parent window after 2 seconds delay
         if self.parent_window:
             self.parent_window.withdraw()
         
-        # Auto close after 2 seconds
-        self.root.after(2000, self.close_window)
+        # Close the authentication window
+        self.close_window()
     
     def show_failed(self):
-        """Show failed message"""
+        """Show failed message - keep main window visible"""
         self.update_status("❌ Authentication failed!", "#e74c3c")
         self.message_label.config(text="Authentication Failed\nAccess Denied", fg="#e74c3c")
         self.cancel_btn.config(text="Close", bg="#e74c3c")
         self.auth_result = False
         
+        # DON'T hide main window on failure - it stays visible
         # Auto close after 3 seconds
         self.root.after(3000, self.close_window)
     
     def cancel_auth(self):
-        """Cancel authentication"""
+        """Cancel authentication - keep main window visible"""
         self.auth_result = False
+        # DON'T hide main window on cancel - it stays visible
         self.close_window()
     
     def close_window(self):
-        """Close the window"""
+        """Close the authentication window"""
         try:
             self.root.destroy()
         except:

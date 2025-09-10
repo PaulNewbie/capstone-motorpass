@@ -62,12 +62,11 @@ def restart_application():
     subprocess.Popen([sys.executable, script_path])
     sys.exit(0)
 
-# Simple wrapper functions - minimal cleanup
 def student_wrapper(main_window=None):
     """Simple wrapper - just hide window, run process, restart"""
     try:
         if main_window:
-            main_window.withdraw()  # Hide main window
+            main_window.withdraw()  # Hide main window for student
         
         result = student_verification()  # Run your original function
         
@@ -79,7 +78,7 @@ def guest_wrapper(main_window=None):
     """Simple wrapper - just hide window, run process, restart"""
     try:
         if main_window:
-            main_window.withdraw()  # Hide main window
+            main_window.withdraw()  # Hide main window for guest
         
         result = guest_verification()  # Run your original function
         
@@ -88,12 +87,11 @@ def guest_wrapper(main_window=None):
         restart_application()  # Always restart after
 
 def admin_wrapper(main_window=None):
-    """Simple wrapper - just hide window, run process, restart"""
+    """FIXED: Don't hide main window - let admin authentication handle it"""
     try:
-        if main_window:
-            main_window.withdraw()  # Hide main window
-        
-        result = admin_panel()  # Run your original function
+        # DON'T hide main_window here - pass it to admin_panel instead
+        # The AdminFingerprintGUI will handle hiding it ONLY after successful auth
+        result = admin_panel(main_window=main_window)  # Pass main_window to admin_panel
         
         return result
     finally:

@@ -486,31 +486,31 @@ def admin_panel(main_window=None):
             return
         print("✅ Super admin setup complete!")
     
-    # Role-based authentication - PASS main_window to show fingerprint GUI on top of background
+    # Role-based authentication - main_window stays visible during authentication
     print("\n🔐 Opening authentication...")
     
     try:
         from etc.services.fingerprint import authenticate_admin_with_role
         
-        # Pass main_window so fingerprint GUI appears on top of background
+        # Pass main_window - it will stay visible during authentication
+        # AdminFingerprintGUI will only hide it AFTER successful authentication
         user_role = authenticate_admin_with_role(main_window=main_window)
         
         if not user_role:
             print("❌ Authentication failed!")
+            # Main window remains visible since authentication failed
             return
         
         print(f"✅ Authenticated as: {user_role}")
         
     except Exception as e:
         print(f"❌ Authentication Error: {e}")
+        # Main window remains visible on error
         return
     
-    # NOW hide main window after successful authentication
-    '''
-    if main_window:
-        print("🔄 Hiding main window...")
-        main_window.withdraw()
-    '''
+    # At this point, main_window should already be hidden by successful authentication
+    # in AdminFingerprintGUI.show_success() method
+    
     try:
         from etc.ui.admin_gui import AdminPanelGUI
         
