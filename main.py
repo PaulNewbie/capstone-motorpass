@@ -15,12 +15,12 @@ from etc.controllers.guest import guest_verification
 from config import SYSTEM_NAME, SYSTEM_VERSION
 
 # Import services
-from etc.services.led_control import (
+from etc.services.hardware.led_control import (
     init_led_system, 
     set_led_idle, 
     cleanup_led_system
 )
-from etc.services.rpi_camera import force_camera_cleanup
+from etc.services.hardware.rpi_camera import force_camera_cleanup
 from database.db_operations import initialize_all_databases
 
 def initialize_system():

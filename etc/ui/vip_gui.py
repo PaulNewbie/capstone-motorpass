@@ -28,7 +28,7 @@ def handle_vip_access(parent_root):
         def run_auth():
             nonlocal authenticated
             # This will run the same authentication logic as Admin button
-            from etc.services.fingerprint import finger, adafruit_fingerprint
+            from etc.services.hardware.fingerprint import finger, adafruit_fingerprint
             import time
             
             attempts = 0

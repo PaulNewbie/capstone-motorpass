@@ -10,6 +10,14 @@ ENABLE_BUZZER = True    # Set to False to disable buzzer
 ENABLE_LED = True     # Set to False to disable LED
 
 # =============================================================================
+# FILE PATHS CONFIGURATION - Centralized JSON file paths
+# =============================================================================
+# JSON Database Files
+FINGERPRINT_DATA_FILE = "json_folder/fingerprint_database.json"
+ADMIN_DATA_FILE = "json_folder/admin_database.json"
+ADMIN_ROLES_FILE = "json_folder/admin_roles.json"
+
+# =============================================================================
 # CAMERA CONFIGURATION - RPi Camera 3 Only
 # =============================================================================
 USE_RPI_CAMERA = True  # Always True - no fallback

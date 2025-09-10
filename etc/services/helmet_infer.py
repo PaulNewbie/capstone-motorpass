@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 import time
-from etc.services.rpi_camera import force_camera_cleanup, CameraContext
+from etc.services.hardware.rpi_camera import force_camera_cleanup, CameraContext
 
 # === Helmet Detection Config ===
 MODEL_PATH = "best.onnx"

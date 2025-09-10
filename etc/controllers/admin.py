@@ -1,7 +1,7 @@
-# controllers/admin.py - Updated with GUI integration
+# controllers/admin.py - CLEANED UP with admin enrollment functions
 
 from config import ADMIN_MENU
-from etc.services.fingerprint import *
+from etc.services.hardware.fingerprint import *
 
 from database.db_operations import (
     get_all_time_records,
@@ -17,77 +17,31 @@ from etc.utils.display_helpers import (
     display_separator
 )
 
+# Import from utils - NO MORE DUPLICATES!
+from etc.utils.json_database import (
+    load_admin_database, 
+    save_admin_database,
+    load_admin_roles,
+    save_admin_roles,
+    load_fingerprint_database,
+    save_fingerprint_database
+)
+
 import time
 import json
 import os
 
-# =================== ADMIN DATABASE FUNCTIONS ===================
+# =================== ADMIN ENROLLMENT FUNCTIONS ===================
 
-def load_admin_database():
-    """Load admin database (create if not exists)"""
-    admin_file = "json_folder/admin_database.json"
-    if os.path.exists(admin_file):
-        try:
-            with open(admin_file, 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_admin_database(database):
-    """Save admin database"""
-    os.makedirs("json_folder", exist_ok=True)
-    with open("json_folder/admin_database.json", 'w') as f:
-        json.dump(database, f, indent=4)
-        
-# =================== SLOT MANAGEMENT FUNCTIONS ===================
-
-def find_next_available_slot():
-    """Automatically find the next available slot (skips slot 1 for admin)"""
-    try:
-        # Read current templates from sensor
-        if finger.read_templates() != adafruit_fingerprint.OK:
-            print("❌ Failed to read sensor templates")
-            return None
-        
-        # Load fingerprint database
-        database = load_fingerprint_database()
-        
-        # Find next available slot starting from 2 (skip admin slot 1)
-        for slot in range(2, finger.library_size + 1):
-            if str(slot) not in database:
-                print(f"🎯 Auto-assigned slot: #{slot}")
-                return slot
-        
-        print("❌ No available slots found")
-        return None
-        
-    except Exception as e:
-        print(f"❌ Error finding available slot: {e}")
-        return None
-
-# =================== ADMIN AUTHENTICATION ===================
-
-def check_admin_fingerprint_exists():
-    """Check if admin fingerprint is enrolled in slot 1"""
-    try:
-        if finger.read_templates() != adafruit_fingerprint.OK:
-            return False
-        admin_db = load_admin_database()
-        return "1" in admin_db
-    except:
-        return False
-
-def enroll_admin_fingerprint():
-    """Enroll admin fingerprint in slot 1"""
-    print(f"\n🔐 ADMIN FINGERPRINT ENROLLMENT")
-    print("⚠️  This will enroll the admin fingerprint at slot #1")
+def enroll_super_admin():
+    """Enroll super admin fingerprint in slot 1"""
+    print("\n🔐 ENROLL SUPER ADMIN FINGERPRINT")
     
-    # Check if admin exists
+    # Check if admin already exists
     try:
         admin_db = load_admin_database()
         if "1" in admin_db:
-            print(f"⚠️  Admin fingerprint already exists!")
+            print(f"⚠️  Super admin already exists: {admin_db['1'].get('name', 'Unknown')}")
             if input("Replace it? (y/N): ").lower() != 'y':
                 print("❌ Cancelled.")
                 return False
@@ -95,12 +49,12 @@ def enroll_admin_fingerprint():
         pass
     
     # Get admin name
-    admin_name = input("Enter admin name: ").strip()
+    admin_name = input("Enter super admin name: ").strip()
     if not admin_name:
-        print("❌ Admin name required.")
+        print("❌ Super admin name required.")
         return False
     
-    print(f"👤 Enrolling: {admin_name}")
+    print(f"👤 Enrolling super admin: {admin_name}")
     
     # Fingerprint enrollment process
     for fingerimg in range(1, 3):
@@ -132,22 +86,157 @@ def enroll_admin_fingerprint():
     if finger.store_model(1) == adafruit_fingerprint.OK:
         print("✅")
         
-        # Save admin info
+        # Save super admin info
         admin_db = load_admin_database()
         admin_db["1"] = {
             "name": admin_name,
-            "role": "admin",
+            "role": "super_admin",
             "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S")
         }
         save_admin_database(admin_db)
         
-        print(f"🎉 Admin enrolled: {admin_name}")
+        # Save role mapping
+        roles_db = load_admin_roles()
+        roles_db["1"] = "super_admin"
+        save_admin_roles(roles_db)
+        
+        print(f"🎉 Super admin enrolled: {admin_name}")
         return True
     else:
         print("❌ Storage failed")
         return False
 
+def enroll_guard_admin():
+    """Enroll guard admin fingerprint in slot 2"""
+    print("\n🛡️ ENROLL GUARD ADMIN FINGERPRINT")
+    
+    # Check if guard already exists
+    try:
+        admin_db = load_admin_database()
+        fingerprint_db = load_fingerprint_database()
+        
+        if "2" in admin_db or "2" in fingerprint_db:
+            existing_name = admin_db.get("2", {}).get("name") or fingerprint_db.get("2", {}).get("name", "Unknown")
+            print(f"⚠️  Guard admin already exists: {existing_name}")
+            if input("Replace it? (y/N): ").lower() != 'y':
+                print("❌ Cancelled.")
+                return False
+    except:
+        pass
+    
+    # Get guard name
+    guard_name = input("Enter guard admin name: ").strip()
+    if not guard_name:
+        print("❌ Guard admin name required.")
+        return False
+    
+    print(f"👤 Enrolling guard admin: {guard_name}")
+    
+    # Fingerprint enrollment process
+    for fingerimg in range(1, 3):
+        print(f"👆 Place finger {'(first time)' if fingerimg == 1 else '(again)'}...", end="")
+        
+        while finger.get_image() != adafruit_fingerprint.OK:
+            print(".", end="")
+        print("✅")
+
+        print("🔄 Processing...", end="")
+        if finger.image_2_tz(fingerimg) != adafruit_fingerprint.OK:
+            print("❌ Failed")
+            return False
+        print("✅")
+
+        if fingerimg == 1:
+            print("✋ Remove finger")
+            time.sleep(1)
+            while finger.get_image() != adafruit_fingerprint.NOFINGER:
+                pass
+
+    print("🗝️ Creating model...", end="")
+    if finger.create_model() != adafruit_fingerprint.OK:
+        print("❌ Failed")
+        return False
+    print("✅")
+
+    print(f"💾 Storing to slot 2...", end="")
+    if finger.store_model(2) == adafruit_fingerprint.OK:
+        print("✅")
+        
+        # Save guard info to fingerprint database (for consistency with other users)
+        fingerprint_db = load_fingerprint_database()
+        fingerprint_db["2"] = {
+            "name": guard_name,
+            "user_type": "GUARD_ADMIN",
+            "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "slot": 2
+        }
+        save_fingerprint_database(fingerprint_db)
+        
+        # Also save to admin database for role mapping
+        admin_db = load_admin_database()
+        admin_db["2"] = {
+            "name": guard_name,
+            "role": "guard",
+            "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        save_admin_database(admin_db)
+        
+        # Save role mapping
+        roles_db = load_admin_roles()
+        roles_db["2"] = "guard"
+        save_admin_roles(roles_db)
+        
+        print(f"🎉 Guard admin enrolled: {guard_name}")
+        return True
+    else:
+        print("❌ Storage failed")
+        return False
+
+# =================== ADMIN AUTHENTICATION HELPERS ===================
+
+def check_admin_fingerprint_exists():
+    """Check if admin fingerprint is enrolled in slot 1"""
+    try:
+        if finger.read_templates() != adafruit_fingerprint.OK:
+            return False
+        admin_db = load_admin_database()
+        return "1" in admin_db
+    except:
+        return False
+
+# Legacy function for compatibility
+def enroll_admin_fingerprint():
+    """Legacy function - redirects to enroll_super_admin"""
+    return enroll_super_admin()
+
+# =================== SLOT MANAGEMENT FUNCTIONS ===================
+
+def find_next_available_slot():
+    """Automatically find the next available slot (skips slots 1-2 for admins)"""
+    try:
+        # Read current templates from sensor
+        if finger.read_templates() != adafruit_fingerprint.OK:
+            print("❌ Failed to read sensor templates")
+            return None
+        
+        # Load fingerprint database
+        database = load_fingerprint_database()
+        
+        # Find next available slot starting from 3 (skip admin slots 1-2)
+        for slot in range(3, finger.library_size + 1):
+            if str(slot) not in database:
+                print(f"🎯 Auto-assigned slot: #{slot}")
+                return slot
+        
+        print("❌ No available slots found")
+        return None
+        
+    except Exception as e:
+        print(f"❌ Error finding available slot: {e}")
+        return None
+
 # =================== ADMIN FUNCTIONS ===================
+
 def admin_enroll():
     """Enroll new user (student or staff)"""
     if finger.read_templates() != adafruit_fingerprint.OK:
@@ -156,10 +245,10 @@ def admin_enroll():
     
     print(f"📊 Current enrollments: {finger.template_count}")
 
-    # Get slot (skip admin slot 1)
+    # Get slot (skip admin slots 1-2)
     location = find_next_available_slot()
-    if location == 1:
-        print("❌ Slot #1 reserved for admin. Use slot 2+")
+    if location in [1, 2]:
+        print("❌ Slots #1-2 reserved for admins. Use slot 3+")
         return
     
     success = enroll_finger_with_user_info(location)  
@@ -177,18 +266,22 @@ def admin_view_enrolled():
     
     student_count = 0
     staff_count = 0
+    admin_count = 0
     
     for finger_id, info in database.items():
-        # Skip admin slot
-        if finger_id == "1":
-            continue
-        
         user_type = info.get('user_type', 'STUDENT')
         
+        # Count users by type
         if user_type == 'STUDENT':
             student_count += 1
-        else:
+        elif user_type == 'STAFF':
             staff_count += 1
+        elif user_type in ['GUARD_ADMIN']:
+            admin_count += 1
+            
+        # Skip admin slots for regular listing
+        if finger_id in ["1", "2"] and user_type in ['GUARD_ADMIN']:
+            continue
         
         print(f"🆔 Slot: {finger_id}")
         print(f"👤 Name: {info['name']}")
@@ -197,7 +290,7 @@ def admin_view_enrolled():
         if user_type == 'STUDENT':
             print(f"🎓 Student ID: {info.get('student_id', 'N/A')}")
             print(f"📚 Course: {info.get('course', 'N/A')}")
-        else:  # STAFF
+        elif user_type == 'STAFF':
             print(f"👔 Staff No.: {info.get('staff_no', 'N/A')}")
             print(f"💼 Role: {info.get('staff_role', 'N/A')}")
         
@@ -209,16 +302,59 @@ def admin_view_enrolled():
     
     total_count = student_count + staff_count
     if total_count == 0:
-        print("📁 No users enrolled.")
+        print("📁 No regular users enrolled.")
     else:
         print(f"\n📊 Total Users: {total_count}")
         print(f"   🎓 Students: {student_count}")
         print(f"   👔 Staff: {staff_count}")
-        
-def admin_delete_fingerprint(slot_id=None):
-    """Delete user fingerprint - SIMPLE FIX"""
-    from etc.services.fingerprint import finger, load_fingerprint_database, save_fingerprint_database
+        print(f"   🛡️ Admins: {admin_count}")
+
+def admin_view_admins():
+    """View all admin accounts"""
+    print("\n👥 ADMIN ACCOUNTS")
+    print("=" * 50)
     
+    try:
+        admin_db = load_admin_database()
+        fingerprint_db = load_fingerprint_database()
+        
+        if not admin_db and "2" not in fingerprint_db:
+            print("📭 No admin accounts found.")
+            return
+        
+        # Show super admin (slot 1)
+        if "1" in admin_db:
+            info = admin_db["1"]
+            name = info.get('name', 'Unknown')
+            enrolled_date = info.get('enrolled_date', 'Unknown')
+            print(f"👑 Slot #1: {name} (Super Admin)")
+            print(f"   Enrolled: {enrolled_date}")
+            print()
+        
+        # Show guard admin (slot 2)
+        if "2" in fingerprint_db:
+            info = fingerprint_db["2"]
+            name = info.get('name', 'Unknown')
+            enrolled_date = info.get('enrolled_date', 'Unknown')
+            print(f"🛡️ Slot #2: {name} (Guard Admin)")
+            print(f"   Enrolled: {enrolled_date}")
+            print()
+        
+        # Show any other admin slots
+        for slot_id, info in admin_db.items():
+            if slot_id not in ["1", "2"]:
+                role = info.get('role', 'admin')
+                name = info.get('name', 'Unknown')
+                enrolled_date = info.get('enrolled_date', 'Unknown')
+                print(f"🔧 Slot #{slot_id}: {name} ({role.title()})")
+                print(f"   Enrolled: {enrolled_date}")
+                print()
+        
+    except Exception as e:
+        print(f"❌ Error loading admin accounts: {e}")
+
+def admin_delete_fingerprint(slot_id=None):
+    """Delete user fingerprint"""
     database = load_fingerprint_database()
     if not database:
         print("📁 No users enrolled.")
@@ -237,7 +373,10 @@ def admin_delete_fingerprint(slot_id=None):
     slot_id_str = str(slot_id)
     
     if slot_id_str == "1":
-        print("❌ Cannot delete admin slot. Use 'Change Admin' option.")
+        print("❌ Cannot delete super admin slot. Use 'Change Admin' option.")
+        return
+    elif slot_id_str == "2":
+        print("❌ Cannot delete guard admin slot. Use admin management.")
         return
         
     # Check if exists in database
@@ -265,10 +404,10 @@ def admin_delete_fingerprint(slot_id=None):
             print("❌ Failed to delete from sensor.")
     except Exception as e:
         print(f"❌ Error: {e}")
-              
+
 def admin_reset_all():
     """Reset all system data with confirmation"""
-    if not confirm_action("Delete ALL student fingerprints?", dangerous=True):
+    if not confirm_action("Delete ALL student/staff fingerprints?", dangerous=True):
         print("❌ Cancelled.")
         return
         
@@ -279,19 +418,38 @@ def admin_reset_all():
     try:
         database = load_fingerprint_database()
         
-        # Delete all student fingerprints (preserve admin)
+        # Delete all student/staff fingerprints (preserve admin slots 1-2)
         for slot_id in list(database.keys()):
-            if slot_id != "1":
+            if slot_id not in ["1", "2"]:
                 finger.delete_model(int(slot_id))
         
-        save_fingerprint_database({})
-        print("✅ All student data reset. Admin preserved.")
+        # Keep only admin slots
+        admin_only_db = {k: v for k, v in database.items() if k in ["1", "2"]}
+        save_fingerprint_database(admin_only_db)
+        print("✅ All student/staff data reset. Admins preserved.")
         
     except Exception as e:
         print(f"❌ Reset error: {e}")
 
+def admin_change_fingerprint():
+    """Change admin fingerprint (hidden option)"""
+    print("\n🔄 CHANGE ADMIN FINGERPRINT")
+    print("⚠️  This will replace the current admin fingerprint")
+    
+    if not confirm_action("Replace admin fingerprint?", dangerous=True):
+        print("❌ Cancelled.")
+        return
+    
+    if enroll_super_admin():
+        print("✅ Admin fingerprint changed!")
+    else:
+        print("❌ Failed to change.")
+
+# =================== SYNC AND OTHER FUNCTIONS ===================
+
 def admin_sync_database():
     """Sync database from Google Sheets - saves directly to motorpass.db"""
+    # ... (keep existing sync function as is)
     try:
         import gspread
         from oauth2client.service_account import ServiceAccountCredentials
@@ -420,7 +578,7 @@ def admin_sync_database():
     except Exception as e:
         print(f"❌ Sync failed: {e}")
         print("💡 Check your credentials.json and internet connection")
-                    
+
 def admin_view_time_records():
     """View all time records with user type information"""
     records = get_all_time_records()
@@ -440,7 +598,7 @@ def admin_view_time_records():
         print("-" * 50)
 
 def admin_clear_time_records():
-
+    """Clear all time records"""
     if not confirm_action("Clear ALL time records?", dangerous=True):
         print("❌ Cancelled.")
         return
@@ -453,63 +611,39 @@ def admin_clear_time_records():
     except Exception as e:
         print(f"❌ Error: {e}")
 
-
-def admin_change_fingerprint():
-    """Change admin fingerprint (hidden option)"""
-    print("\n🔄 CHANGE ADMIN FINGERPRINT")
-    print("⚠️  This will replace the current admin fingerprint")
-    
-    if not confirm_action("Replace admin fingerprint?", dangerous=True):
-        print("❌ Cancelled.")
-        return
-    
-    if enroll_admin_fingerprint():
-        print("✅ Admin fingerprint changed!")
-    else:
-        print("❌ Failed to change.")
-
-# =================== MAIN ADMIN PANEL WITH GUI ===================
+# =================== MAIN ADMIN PANEL ===================
 
 def admin_panel(main_window=None):
     """Admin panel with role-based access control"""
     print("\n🔧 ADMIN PANEL")
     
     # Check admin fingerprint exists
-    from etc.services.fingerprint import check_admin_fingerprint_exists, enroll_admin_fingerprint
-    
     if not check_admin_fingerprint_exists():
-        print("\n🔐 NO ADMIN FINGERPRINT FOUND!")
+        print("\n🔐 NO SUPER ADMIN FINGERPRINT FOUND!")
         if input("Setup super admin fingerprint? (y/N): ").lower() != 'y':
             return
-        if not enroll_admin_fingerprint():
+        if not enroll_super_admin():
             print("❌ Setup failed.")
             return
         print("✅ Super admin setup complete!")
     
-    # Role-based authentication - main_window stays visible during authentication
+    # Role-based authentication
     print("\n🔐 Opening authentication...")
     
     try:
-        from etc.services.fingerprint import authenticate_admin_with_role
+        from etc.services.hardware.fingerprint import authenticate_admin_with_role
         
-        # Pass main_window - it will stay visible during authentication
-        # AdminFingerprintGUI will only hide it AFTER successful authentication
         user_role = authenticate_admin_with_role(main_window=main_window)
         
         if not user_role:
             print("❌ Authentication failed!")
-            # Main window remains visible since authentication failed
             return
         
         print(f"✅ Authenticated as: {user_role}")
         
     except Exception as e:
         print(f"❌ Authentication Error: {e}")
-        # Main window remains visible on error
         return
-    
-    # At this point, main_window should already be hidden by successful authentication
-    # in AdminFingerprintGUI.show_success() method
     
     try:
         from etc.ui.admin_gui import AdminPanelGUI
@@ -524,7 +658,9 @@ def admin_panel(main_window=None):
             'clear_records': admin_clear_time_records,
             'get_stats': get_database_stats,
             'change_admin': admin_change_fingerprint,
-            'reset': admin_reset_all
+            'reset': admin_reset_all,
+            'view_admins': admin_view_admins,
+            'enroll_guard': enroll_guard_admin
         }
         
         # Create admin panel with role (fullscreen)
@@ -540,45 +676,3 @@ def admin_panel(main_window=None):
             main_window.deiconify()
     
     print("👋 Admin panel closed")
-    
-def admin_enroll_guard():
-    """Enroll a new guard fingerprint"""
-    print("\n🛡️ ENROLL GUARD")
-    
-    from etc.services.fingerprint import enroll_guard_fingerprint
-    
-    if enroll_guard_fingerprint():
-        print("✅ Guard enrolled successfully!")
-    else:
-        print("❌ Guard enrollment failed!")
-        
-def admin_view_admins():
-    """View all admin accounts"""
-    print("\n👥 ADMIN ACCOUNTS")
-    print("=" * 50)
-    
-    try:
-        from etc.services.fingerprint import load_admin_database, load_admin_roles
-        
-        admin_db = load_admin_database()
-        roles_db = load_admin_roles()
-        
-        if not admin_db:
-            print("📭 No admin accounts found.")
-            return
-        
-        for slot_id, info in sorted(admin_db.items(), key=lambda x: int(x[0])):
-            role = roles_db.get(slot_id, "super_admin")
-            name = info.get('name', 'Unknown')
-            enrolled_date = info.get('enrolled_date', 'Unknown')
-            
-            role_icon = "🛡️" if role == "guard" else "👑"
-            print(f"{role_icon} Slot #{slot_id}: {name}")
-            print(f"   Role: {role.title()}")
-            print(f"   Enrolled: {enrolled_date}")
-            print()
-        
-    except Exception as e:
-        print(f"❌ Error loading admin accounts: {e}")
-
-

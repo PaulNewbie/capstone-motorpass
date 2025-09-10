@@ -2,9 +2,9 @@
 
 from etc.services.license_reader import *
 from etc.services.helmet_infer import verify_helmet
-from etc.services.led_control import *  
-from etc.services.buzzer_control import *
-from etc.services.rpi_camera import force_camera_cleanup
+from etc.services.hardware.led_control import *  
+from etc.services.hardware.buzzer_control import *
+from etc.services.hardware.rpi_camera import force_camera_cleanup
 from etc.utils.display_helpers import display_separator, display_verification_result
 from etc.utils.gui_helpers import show_results_gui, get_guest_info_gui, updated_guest_office_gui
 from etc.utils.timeout_security import timeout_security_verification

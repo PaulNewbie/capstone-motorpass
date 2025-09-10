@@ -56,15 +56,15 @@ class SimpleRefreshManager:
         """Clean up camera, LED, buzzer"""
         try:
             # LED cleanup
-            from etc.services.led_control import set_led_idle, cleanup_led_system
+            from etc.services.hardware.led_control import set_led_idle, cleanup_led_system
             set_led_idle()
             
             # Buzzer cleanup  
-            from etc.services.buzzer_control import cleanup_buzzer
+            from etc.services.hardware.buzzer_control import cleanup_buzzer
             cleanup_buzzer()
             
             # Camera cleanup
-            from etc.services.rpi_camera import force_camera_cleanup
+            from etc.services.hardware.rpi_camera import force_camera_cleanup
             force_camera_cleanup()
             
             print("  ✅ Hardware cleaned")

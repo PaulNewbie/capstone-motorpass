@@ -1,11 +1,11 @@
 # controllers/student.py - FIXED key name for GUI callback
 
-from etc.services.fingerprint import *
+from etc.services.hardware.fingerprint import *
 from etc.services.license_reader import *
 from etc.services.helmet_infer import verify_helmet
-from etc.services.led_control import *
-from etc.services.buzzer_control import *
-from etc.services.rpi_camera import force_camera_cleanup
+from etc.services.hardware.led_control import *
+from etc.services.hardware.buzzer_control import *
+from etc.services.hardware.rpi_camera import force_camera_cleanup
 
 # Import database operations
 from database.db_operations import (
