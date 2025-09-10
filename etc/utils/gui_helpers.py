@@ -6,6 +6,8 @@ from tkinter import ttk, messagebox, simpledialog
 import threading
 import os
 
+from refresh import add_refresh_to_window
+
 def show_results_gui(title, image=None, text="", success=True, details=None):
     """Display results in a GUI window"""
     # Create results window
@@ -103,6 +105,8 @@ def get_guest_info_gui(detected_name=""):
         info_window.geometry("500x400")
     
     info_window.configure(bg="#FFFFFF")
+    
+    add_refresh_to_window(info_window)
     
     # Center window
     info_window.update_idletasks()

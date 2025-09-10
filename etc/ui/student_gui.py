@@ -10,6 +10,11 @@ from typing import Dict
 import sys
 import queue
 
+try:
+    from refresh import add_refresh_to_window
+except ImportError:
+    add_refresh_to_window = None
+
 class StudentVerificationGUI:
     def __init__(self, verification_function):
         self.root = tk.Tk()
@@ -56,6 +61,7 @@ class StudentVerificationGUI:
         self.root.bind('<Escape>', self.toggle_fullscreen_and_close)
         # Also bind F11 for fullscreen toggle
         self.root.bind('<F11>', self.toggle_fullscreen)
+        add_refresh_to_window(self.root)
         
     def toggle_fullscreen(self, event=None):
         """Toggle fullscreen mode - useful for admin access or testing"""

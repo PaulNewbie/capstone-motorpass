@@ -20,6 +20,11 @@ from etc.controllers.vip import (
 
 from database.vip_operations import get_vip_stats
 
+try:
+    from refresh import add_refresh_to_window
+except ImportError:
+    add_refresh_to_window = None
+
 class MotorPassGUI:
     def __init__(self, system_name, system_version, admin_function, student_function, guest_function):
         self.system_name = system_name
@@ -28,7 +33,6 @@ class MotorPassGUI:
         self.student_function = student_function
         self.guest_function = guest_function
         
-        # ADD ONLY THIS LINE - restart tracking
         self._restart_needed = False
         
         self.root = tk.Tk()
@@ -102,6 +106,7 @@ class MotorPassGUI:
         self.create_clock()
         self.create_time_in_counter()
         self.create_selection_interface()
+        add_refresh_to_window(self.root)
         
     def center_window(self):
         """Center window on screen"""

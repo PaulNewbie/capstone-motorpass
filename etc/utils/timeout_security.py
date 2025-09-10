@@ -4,6 +4,11 @@ import tkinter as tk
 from tkinter import messagebox
 from database.office_operation import verify_office_code
 
+try:
+    from refresh import add_refresh_to_window
+except ImportError:
+    add_refresh_to_window = None
+
 def timeout_security_verification(guest_info, max_attempts=3):
     """
     Security verification for guest timeout with office code
@@ -33,6 +38,9 @@ def timeout_security_verification(guest_info, max_attempts=3):
     security_window.grab_set()
     security_window.lift()
     security_window.attributes('-topmost', True)
+    
+    if add_refresh_to_window:
+        add_refresh_to_window(security_window)
     
     # Main frame
     main_frame = tk.Frame(security_window, bg="#FFFFFF")
@@ -75,12 +83,18 @@ def timeout_security_verification(guest_info, max_attempts=3):
         office_name = guest_info.get('office', '')
         
         if not entered_code:
+            security_window.attributes('-topmost', False)
             messagebox.showerror("Error", "Please enter the security code!")
+            security_window.attributes('-topmost', True)
+            security_window.lift()
             return
         
         if len(entered_code) != 3 or not entered_code.isdigit():
+            security_window.attributes('-topmost', False)
             messagebox.showerror("Error", "Code must be exactly 3 digits!")
             code_entry.delete(0, tk.END)
+            security_window.attributes('-topmost', True)
+            security_window.lift()
             return
         
         # Verify code
@@ -93,16 +107,22 @@ def timeout_security_verification(guest_info, max_attempts=3):
             
             if attempts_left[0] > 0:
                 attempts_label.config(text=f"Attempts remaining: {attempts_left[0]}")
+                security_window.attributes('-topmost', False)
                 messagebox.showerror("❌ Invalid Code", 
                                    f"Incorrect code!\nAttempts remaining: {attempts_left[0]}")
+                security_window.attributes('-topmost', True)
+                security_window.lift()
                 code_entry.delete(0, tk.END)
                 code_entry.focus_set()
             else:
                 result[0] = False
+                security_window.attributes('-topmost', False)
                 messagebox.showerror("🚨 SECURITY ALERT", 
                                    "Maximum attempts exceeded!\n" +
                                    "Possible intruder detected.\n" +
                                    "Timeout DENIED.")
+                security_window.attributes('-topmost', True)
+                security_window.lift()
                 security_window.destroy()
     
     def cancel_timeout():
