@@ -27,182 +27,18 @@ from etc.utils.json_database import (
     save_fingerprint_database
 )
 
+from etc.controllers.auth.fingerprint_admin import (
+    enroll_super_admin, 
+    check_admin_fingerprint_exists, 
+    enroll_guard_admin,
+    enroll_finger_with_user_info,
+    get_user_id_gui
+)
+
 import time
 import json
 import os
 
-# =================== ADMIN ENROLLMENT FUNCTIONS ===================
-
-def enroll_super_admin():
-    """Enroll super admin fingerprint in slot 1"""
-    print("\n🔐 ENROLL SUPER ADMIN FINGERPRINT")
-    
-    # Check if admin already exists
-    try:
-        admin_db = load_admin_database()
-        if "1" in admin_db:
-            print(f"⚠️  Super admin already exists: {admin_db['1'].get('name', 'Unknown')}")
-            if input("Replace it? (y/N): ").lower() != 'y':
-                print("❌ Cancelled.")
-                return False
-    except:
-        pass
-    
-    # Get admin name
-    admin_name = input("Enter super admin name: ").strip()
-    if not admin_name:
-        print("❌ Super admin name required.")
-        return False
-    
-    print(f"👤 Enrolling super admin: {admin_name}")
-    
-    # Fingerprint enrollment process
-    for fingerimg in range(1, 3):
-        print(f"👆 Place finger {'(first time)' if fingerimg == 1 else '(again)'}...", end="")
-        
-        while finger.get_image() != adafruit_fingerprint.OK:
-            print(".", end="")
-        print("✅")
-
-        print("🔄 Processing...", end="")
-        if finger.image_2_tz(fingerimg) != adafruit_fingerprint.OK:
-            print("❌ Failed")
-            return False
-        print("✅")
-
-        if fingerimg == 1:
-            print("✋ Remove finger")
-            time.sleep(1)
-            while finger.get_image() != adafruit_fingerprint.NOFINGER:
-                pass
-
-    print("🗝️ Creating model...", end="")
-    if finger.create_model() != adafruit_fingerprint.OK:
-        print("❌ Failed")
-        return False
-    print("✅")
-
-    print(f"💾 Storing...", end="")
-    if finger.store_model(1) == adafruit_fingerprint.OK:
-        print("✅")
-        
-        # Save super admin info
-        admin_db = load_admin_database()
-        admin_db["1"] = {
-            "name": admin_name,
-            "role": "super_admin",
-            "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S")
-        }
-        save_admin_database(admin_db)
-        
-        # Save role mapping
-        roles_db = load_admin_roles()
-        roles_db["1"] = "super_admin"
-        save_admin_roles(roles_db)
-        
-        print(f"🎉 Super admin enrolled: {admin_name}")
-        return True
-    else:
-        print("❌ Storage failed")
-        return False
-
-def enroll_guard_admin():
-    """Enroll guard admin fingerprint in slot 2"""
-    print("\n🛡️ ENROLL GUARD ADMIN FINGERPRINT")
-    
-    # Check if guard already exists
-    try:
-        admin_db = load_admin_database()
-        fingerprint_db = load_fingerprint_database()
-        
-        if "2" in admin_db or "2" in fingerprint_db:
-            existing_name = admin_db.get("2", {}).get("name") or fingerprint_db.get("2", {}).get("name", "Unknown")
-            print(f"⚠️  Guard admin already exists: {existing_name}")
-            if input("Replace it? (y/N): ").lower() != 'y':
-                print("❌ Cancelled.")
-                return False
-    except:
-        pass
-    
-    # Get guard name
-    guard_name = input("Enter guard admin name: ").strip()
-    if not guard_name:
-        print("❌ Guard admin name required.")
-        return False
-    
-    print(f"👤 Enrolling guard admin: {guard_name}")
-    
-    # Fingerprint enrollment process
-    for fingerimg in range(1, 3):
-        print(f"👆 Place finger {'(first time)' if fingerimg == 1 else '(again)'}...", end="")
-        
-        while finger.get_image() != adafruit_fingerprint.OK:
-            print(".", end="")
-        print("✅")
-
-        print("🔄 Processing...", end="")
-        if finger.image_2_tz(fingerimg) != adafruit_fingerprint.OK:
-            print("❌ Failed")
-            return False
-        print("✅")
-
-        if fingerimg == 1:
-            print("✋ Remove finger")
-            time.sleep(1)
-            while finger.get_image() != adafruit_fingerprint.NOFINGER:
-                pass
-
-    print("🗝️ Creating model...", end="")
-    if finger.create_model() != adafruit_fingerprint.OK:
-        print("❌ Failed")
-        return False
-    print("✅")
-
-    print(f"💾 Storing to slot 2...", end="")
-    if finger.store_model(2) == adafruit_fingerprint.OK:
-        print("✅")
-        
-        # Save guard info to fingerprint database (for consistency with other users)
-        fingerprint_db = load_fingerprint_database()
-        fingerprint_db["2"] = {
-            "name": guard_name,
-            "user_type": "GUARD_ADMIN",
-            "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "slot": 2
-        }
-        save_fingerprint_database(fingerprint_db)
-        
-        # Also save to admin database for role mapping
-        admin_db = load_admin_database()
-        admin_db["2"] = {
-            "name": guard_name,
-            "role": "guard",
-            "enrolled_date": time.strftime("%Y-%m-%d %H:%M:%S")
-        }
-        save_admin_database(admin_db)
-        
-        # Save role mapping
-        roles_db = load_admin_roles()
-        roles_db["2"] = "guard"
-        save_admin_roles(roles_db)
-        
-        print(f"🎉 Guard admin enrolled: {guard_name}")
-        return True
-    else:
-        print("❌ Storage failed")
-        return False
-
-# =================== ADMIN AUTHENTICATION HELPERS ===================
-
-def check_admin_fingerprint_exists():
-    """Check if admin fingerprint is enrolled in slot 1"""
-    try:
-        if finger.read_templates() != adafruit_fingerprint.OK:
-            return False
-        admin_db = load_admin_database()
-        return "1" in admin_db
-    except:
-        return False
 
 # Legacy function for compatibility
 def enroll_admin_fingerprint():
@@ -640,6 +476,11 @@ def admin_panel(main_window=None):
             return
         
         print(f"✅ Authenticated as: {user_role}")
+        
+        # HIDE MAIN WINDOW AFTER SUCCESSFUL AUTHENTICATION (Admin behavior)
+        if main_window:
+            print("🔐 Hiding main window for admin panel...")
+            main_window.withdraw()
         
     except Exception as e:
         print(f"❌ Authentication Error: {e}")

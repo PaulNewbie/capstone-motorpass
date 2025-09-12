@@ -6,6 +6,8 @@ from database.vip_operations import (
     check_vip_status
 )
 
+from etc.controllers.auth.fingerprint_vip import authenticate_admin
+
 def determine_vip_action(plate_number):
     """Determine if plate number should TIME IN or TIME OUT"""
     try:

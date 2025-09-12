@@ -14,6 +14,8 @@ from database.db_operations import (
     record_time_out
 )
 
+from etc.controllers.auth.fingerprint_student import authenticate_fingerprint, authenticate_fingerprint_with_time_tracking
+
 from etc.utils.display_helpers import display_separator, display_verification_result
 from etc.utils.gui_helpers import show_results_gui
 from etc.ui.dialog_helpers_gui import get_manual_name_input

@@ -101,23 +101,20 @@ class AdminFingerprintGUI:
         self.status_label.config(text=message, fg=color)
     
     def show_success(self):
-        """Show success message with delayed main window hiding"""
+        """Show success message - NEVER hides main window"""
         self.update_status("✅ Admin authenticated!", "#27ae60")
         self.message_label.config(text="Welcome Admin!\nAccess Granted", fg="#27ae60")
         self.cancel_btn.config(text="Continue", bg="#27ae60")
         self.auth_result = True
         
-        # Show success message for 2 seconds FIRST
-        self.root.after(3000, self.hide_main_window_and_close)
-    
-    def hide_main_window_and_close(self):
-        """Hide main window and close authentication dialog"""
-        # NOW hide the parent window after 2 seconds delay
+        # IMPORTANT: Keep main window visible during success
         if self.parent_window:
-            self.parent_window.withdraw()
+            self.parent_window.deiconify()  # Ensure main window stays visible
+            self.parent_window.lift()       # Bring it to front
         
-        # Close the authentication window
-        self.close_window()
+        # Close authentication window after 2 seconds
+        # Main window hiding will be handled by the calling controller
+        self.root.after(2000, self.close_window)
     
     def show_failed(self):
         """Show failed message - keep main window visible"""
@@ -126,23 +123,34 @@ class AdminFingerprintGUI:
         self.cancel_btn.config(text="Close", bg="#e74c3c")
         self.auth_result = False
         
-        # DON'T hide main window on failure - it stays visible
+        # Ensure main window stays visible on failure
+        if self.parent_window:
+            self.parent_window.deiconify()
+            self.parent_window.lift()
+        
         # Auto close after 3 seconds
         self.root.after(3000, self.close_window)
     
     def cancel_auth(self):
         """Cancel authentication - keep main window visible"""
         self.auth_result = False
-        # DON'T hide main window on cancel - it stays visible
+        
+        # Ensure main window stays visible when cancelled
+        if self.parent_window:
+            self.parent_window.deiconify()
+            self.parent_window.lift()
+        
         self.close_window()
     
     def close_window(self):
-        """Close the authentication window"""
+        """Close the authentication window - NEVER hides main window"""
         try:
+            # IMPORTANT: Main window visibility is controlled by calling code
+            # This GUI class only handles authentication, not window management
             self.root.destroy()
         except:
             pass
-            
+                     
 # For Student/Staff GUI Fingerprint
 class FingerprintAuthGUI:
     """Enhanced Fingerprint Authentication GUI for students/staff"""
