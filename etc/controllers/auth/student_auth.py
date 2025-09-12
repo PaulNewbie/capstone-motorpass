@@ -1,4 +1,4 @@
-# etc/controllers/auth/fingerprint_student.py
+# etc/controllers/auth/student_auth.py
 # Student/Staff fingerprint authentication functions
 
 import time
@@ -11,11 +11,6 @@ from tkinter import simpledialog, messagebox
 from database.db_operations import (
     record_time_attendance
 )
-
-
-# =================== HARDWARE SETUP ===================
-uart = serial.Serial("/dev/ttyS0", baudrate=57600, timeout=1)
-finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
 
 # =================== STUDENT/STAFF AUTHENTICATION ===================
 

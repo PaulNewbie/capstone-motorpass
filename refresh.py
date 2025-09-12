@@ -1,4 +1,4 @@
-# simple_refresh.py - Simple F5 Soft Refresh System
+# refresh.py - Simple F5 Soft Refresh System
 """
 Simple F5 Refresh System for MotorPass
 Press F5 to refresh stuck forms without killing the entire system

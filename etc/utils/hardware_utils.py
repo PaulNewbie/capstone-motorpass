@@ -66,7 +66,7 @@ def check_admin_fingerprint_exists():
         return False
 
 def find_next_available_slot():
-    """Automatically find the next available slot (skips slot 1 for admin)"""
+    """Automatically find the next available slot (skips slots 1-2 for admins)"""
     try:
         # Read current templates from sensor
         if finger.read_templates() != adafruit_fingerprint.OK:
@@ -76,8 +76,8 @@ def find_next_available_slot():
         # Load fingerprint database
         database = load_fingerprint_database()
         
-        # Find next available slot starting from 2 (skip admin slot 1)
-        for slot in range(2, finger.library_size + 1):
+        # Find next available slot starting from 3 (skip admin slots 1-2)
+        for slot in range(3, finger.library_size + 1):
             if str(slot) not in database:
                 print(f"🎯 Auto-assigned slot: #{slot}")
                 return slot

@@ -8,7 +8,7 @@ import time
 from etc.services.hardware.fingerprint import finger, load_fingerprint_database, safe_get_student_by_id, safe_get_staff_by_id
 import adafruit_fingerprint
 
-# For ADMIN GUI Fingerprint
+# For ADMIN and VIP GUI Fingerprint
 class AdminFingerprintGUI:
     def __init__(self, parent_window=None):
         self.auth_result = False

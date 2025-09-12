@@ -1,4 +1,4 @@
-# etc/controllers/auth/fingerprint_admin.py
+# etc/controllers/auth/admin_auth.py
 # Admin fingerprint authentication functions
 
 import time
@@ -16,9 +16,7 @@ from database.db_operations import (
     get_staff_by_id
 )
 
-# =================== HARDWARE SETUP ===================
-uart = serial.Serial("/dev/ttyS0", baudrate=57600, timeout=1)
-finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
+from etc.utils.hardware_utils import check_admin_fingerprint_exists
 
 # =================== ADMIN ENROLLMENT FUNCTIONS ===================
 
@@ -179,16 +177,6 @@ def enroll_guard_admin():
         return False
 
 # =================== ADMIN AUTHENTICATION HELPERS ===================
-
-def check_admin_fingerprint_exists():
-    """Check if admin fingerprint is enrolled in slot 1"""
-    try:
-        if finger.read_templates() != adafruit_fingerprint.OK:
-            return False
-        admin_db = load_admin_database()
-        return "1" in admin_db
-    except:
-        return False
 
 def enroll_finger_with_user_info(location):
     """Enhanced enrollment using Student ID or Staff No - ONLY CALLED FROM ADMIN.PY"""
