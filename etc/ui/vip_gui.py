@@ -1,6 +1,7 @@
 # etc/ui/vip_gui.py
 import tkinter as tk
 from tkinter import messagebox
+import time 
 
 from etc.controllers.vip import (
     determine_vip_action,

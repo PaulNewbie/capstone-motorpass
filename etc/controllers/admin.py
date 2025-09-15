@@ -1,5 +1,4 @@
 # controllers/admin.py - CLEANED UP with admin enrollment functions
-
 from config import ADMIN_MENU
 from etc.services.hardware.fingerprint import *
 
@@ -36,7 +35,6 @@ from etc.controllers.auth.admin_auth import (
     get_user_id_gui
 )
 
-import time
 import json
 import os
 
@@ -201,22 +199,6 @@ def admin_reset_all():
         
     except Exception as e:
         print(f"❌ Reset error: {e}")
-
-'''
-def admin_change_fingerprint():
-    """Change admin fingerprint (hidden option)"""
-    print("\n🔄 CHANGE ADMIN FINGERPRINT")
-    print("⚠️  This will replace the current admin fingerprint")
-    
-    if not confirm_action("Replace admin fingerprint?", dangerous=True):
-        print("❌ Cancelled.")
-        return
-    
-    if enroll_super_admin():
-        print("✅ Admin fingerprint changed!")
-    else:
-        print("❌ Failed to change.")
-'''
 
 #SYNC buttom
 def admin_sync_database():
@@ -480,7 +462,6 @@ def admin_panel(main_window=None):
             'get_time_records': get_all_time_records,
             'clear_records': admin_clear_time_records,
             'get_stats': get_database_stats,
-            'change_admin': admin_change_fingerprint,
             'reset': admin_reset_all,
             'view_admins': admin_view_admins,
             'enroll_guard': enroll_guard_admin

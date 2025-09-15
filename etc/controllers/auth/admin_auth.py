@@ -1,5 +1,4 @@
 # etc/controllers/auth/admin_auth.py
-# Admin fingerprint authentication functions
 
 import time
 import serial
@@ -16,7 +15,7 @@ from database.db_operations import (
     get_staff_by_id
 )
 
-from etc.utils.hardware_utils import check_admin_fingerprint_exists
+from etc.utils.hardware_utils import finger, check_admin_fingerprint_exists
 
 # =================== ADMIN ENROLLMENT FUNCTIONS ===================
 

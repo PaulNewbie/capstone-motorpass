@@ -12,6 +12,8 @@ from database.db_operations import (
     record_time_attendance
 )
 
+from etc.utils.hardware_utils import finger
+
 # =================== STUDENT/STAFF AUTHENTICATION ===================
 
 def authenticate_fingerprint(max_attempts=5):

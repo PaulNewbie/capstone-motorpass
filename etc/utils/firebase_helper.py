@@ -1,4 +1,4 @@
-# firebase_helper.py - Simple helper to avoid import issues
+# firebase_helper.py 
 
 import os
 import sys

@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import threading
 from datetime import datetime
+import time 
 import os
 from PIL import Image, ImageTk
 import json
@@ -1453,34 +1454,3 @@ class AdminPanelGUI:
         exit_btn.bind("<Enter>", lambda e: exit_btn.config(bg='#C0392B'))
         exit_btn.bind("<Leave>", lambda e: exit_btn.config(bg=self.colors['accent']))
 
-
-# Test function
-if __name__ == "__main__":
-    # Mock functions for testing
-    mock_functions = {
-        'authenticate': lambda: True,
-        'enroll': lambda: print("Enrolling..."),
-        'view_users': lambda: print("Viewing users..."),
-        'delete_fingerprint': lambda slot: print(f"Deleting slot {slot}..."),
-        'sync': lambda: print("Syncing..."),
-        'get_time_records': lambda: [
-            {'date': '2024-01-01', 'time': '08:00', 'student_id': '2021-001', 
-             'student_name': 'John Doe', 'user_type': 'STUDENT', 'status': 'IN'},
-            {'date': '2024-01-01', 'time': '17:00', 'student_id': '2021-001', 
-             'student_name': 'John Doe', 'user_type': 'STUDENT', 'status': 'OUT'}
-        ],
-        'clear_records': lambda: print("Clearing records..."),
-        'get_stats': lambda: {
-            'total_students': 150,
-            'total_staff': 25,
-            'total_guests': 50,
-            'students_currently_in': 45,
-            'staff_currently_in': 10,
-            'guests_currently_in': 5,
-            'users_currently_in': 60,
-            'todays_activity': 120
-        }
-    }
-    
-    app = AdminPanelGUI(mock_functions, skip_auth=True)
-    app.run()

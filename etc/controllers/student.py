@@ -18,7 +18,7 @@ from etc.controllers.auth.student_auth import authenticate_fingerprint, authenti
 
 from etc.utils.display_helpers import display_separator, display_verification_result
 from etc.utils.gui_helpers import show_results_gui
-from etc.utils.dialog_helpers_gui import get_manual_name_input
+from etc.utils.dialog_helpers import get_manual_name_input
 
 import time
 from datetime import datetime
