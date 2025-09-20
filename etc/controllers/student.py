@@ -1,11 +1,19 @@
 # controllers/student.py - FIXED key name for GUI callback
+import os
 
 from etc.services.hardware.fingerprint import *
-from etc.services.license_reader import *
-from etc.services.helmet_infer import verify_helmet
 from etc.services.hardware.led_control import *
 from etc.services.hardware.buzzer_control import *
 from etc.services.hardware.rpi_camera import force_camera_cleanup
+
+from etc.services.helmet_infer import verify_helmet
+from etc.services.license_reader import (
+    _count_verification_keywords, 
+    extract_text_from_image, 
+    _detect_name_pattern,
+    complete_verification_flow,
+    auto_capture_license_rpi
+)
 
 # Import database operations
 from database.db_operations import (
@@ -172,234 +180,241 @@ def run_verification_with_gui(status_callback):
             # License is valid
             status_callback({'license_status': 'VALID'})
             
-            # Step 3: License capture and verification
+            # Step 3: Fixed License capture and verification with proper file handling
             status_callback({'current_step': '📄 Capturing license... (Check terminal for camera)'})
-            
+
             print("\n" + "="*60)
             print("📄 LICENSE CAPTURE (Terminal Camera)")
             print("="*60)
-            
-            from etc.services.license_reader import _count_verification_keywords, extract_text_from_image, _detect_name_pattern
+
             license_success = False
-            image_path = None
-            actual_license_name = None
-            
-            for attempt in range(2):  # Try twice
+            final_result = None
+            current_image_path = None  # Track current image for cleanup
+
+            # Create proper fingerprint_info structure for license verification
+            fingerprint_info = {
+                'name': user_info.get('name', ''),
+                'confidence': user_info.get('confidence', 100),
+                'user_type': user_info.get('user_type', 'STUDENT'),
+                'finger_id': user_info.get('finger_id', 'N/A')
+            }
+
+            for attempt in range(2):  # Two attempts max
                 print(f"\n📷 License attempt {attempt + 1}/2")
                 
-                # Create proper fingerprint_info structure for license verification
-                fingerprint_info = {
-                    'name': user_info.get('name', ''),
-                    'confidence': user_info.get('confidence', 100),
-                    'user_type': user_info.get('user_type', 'STUDENT'),
-                    'finger_id': user_info.get('finger_id', 'N/A')
-                }
+                # Clean up previous image if exists (but NOT the current one we're processing)
+                if attempt > 0 and current_image_path and os.path.exists(current_image_path):
+                    try:
+                        os.remove(current_image_path)
+                    except:
+                        pass
                 
-                image_path = auto_capture_license_rpi(
+                current_image_path = auto_capture_license_rpi(
                     reference_name=user_info.get('name', ''),
                     fingerprint_info=fingerprint_info
                 )
                 
-                if image_path:
-                    # Student Permit check is now handled in license_reader.py
-                    try:
-                        ocr_text = extract_text_from_image(image_path)
-                    except ValueError as e:
-                        if "STUDENT_PERMIT_DETECTED" in str(e):
-                            print("❌ Student Permit detected - Access denied")
-                            status_callback({'current_step': '❌ Student Permit not allowed - Access denied'})
-                            set_led_idle()
-                            play_failure()
-                            cleanup_buzzer()
-                            return {'verified': False, 'reason': 'Student Permit not allowed'}
-                        else:
-                            raise e
-                    
-                    keywords_found = _count_verification_keywords(ocr_text)
-                    
-                    # Get the actual name on the license
-                    ocr_lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
-                    actual_license_name = _detect_name_pattern(ocr_text)
-                    
-                    # Show scan results
-                    print(f"\n📋 LICENSE SCAN RESULTS (Attempt {attempt + 1}/2):")
-                    print(f"🎯 Expected Name: '{user_info.get('name', 'N/A')}'")
-                    print(f"🔍 License Holder: '{actual_license_name if actual_license_name else 'NOT FOUND'}'")
-                    print(f"📄 Keywords Found: {keywords_found}")
-                    
-                    # Check if names match
-                    name_matches = False
-                    name_found = actual_license_name is not None and actual_license_name.strip() != ""
-                    similarity_score = 0.0
-                    
-                    if actual_license_name and user_info.get('name'):
-                        import difflib
-                        similarity_score = difflib.SequenceMatcher(
-                            None, 
-                            actual_license_name.lower().strip(), 
-                            user_info.get('name', '').lower().strip()
-                        ).ratio()
-                        
-                        if similarity_score >= 0.9:
-                            name_matches = True
-                            print(f"✅ STRONG MATCH: {similarity_score*100:.1f}% similarity")
-                        else:
-                            print(f"⚠️ NAME MISMATCH: {similarity_score*100:.1f}% similarity")
-                    elif not name_found:
-                        print(f"❌ NO NAME DETECTED: Could not extract name from license")
-                    
-                    # SUCCESS CONDITIONS
-                    has_good_keywords = keywords_found >= 3
-                    has_some_keywords = keywords_found >= 1
-                    perfect_conditions = has_some_keywords and name_found and name_matches
-                    
-                    if perfect_conditions:
-                        print(f"✅ License accepted: Strong name match ({similarity_score*100:.1f}%) overrides keyword requirement")
-                        license_success = True
-                        break
-                    
-                    # AUTO-RETRY CONDITIONS (First attempt)
-                    elif attempt == 0:
-                        retry_reasons = []
-                        if not has_some_keywords:
-                            retry_reasons.append(f"only {keywords_found} keywords (need at least 1)")
-                        elif not has_good_keywords and not name_matches:
-                            retry_reasons.append(f"only {keywords_found} keywords (need 3+ when name doesn't match)")
-                        if not name_found:
-                            retry_reasons.append("no name detected")
-                        elif not name_matches and has_some_keywords:
-                            retry_reasons.append(f"name mismatch ({similarity_score*100:.1f}% similarity)")
-                        
-                        print(f"⚠️ RETRY NEEDED: {', '.join(retry_reasons)}")
-                        print(f"🔄 AUTO-RETRYING: Second attempt starting...")
-                        status_callback({'current_step': '🔄 Auto-retrying license scan...'})
-                        
-                    else:  # Second attempt - more lenient acceptance
-                        if has_some_keywords and name_found:
-                            if name_matches:
-                                print(f"✅ License accepted: Name match ({similarity_score*100:.1f}%) + {keywords_found} keywords (2nd attempt)")
-                            else:
-                                print(f"✅ License accepted: {keywords_found} keywords + name detected (2nd attempt)")
-                            license_success = True
-                            break
-                        else:
-                            print(f"⚠️ SECOND ATTEMPT FAILED")
-                        
-                else:
-                    # Camera capture failed 
-                    print(f"❌ Camera capture failed on attempt {attempt + 1}")
-                    if attempt == 0:  # First attempt failed
-                        print("❌ Student Driver License likely detected in camera preview")
-                        status_callback({'current_step': '❌ Student Driver License not allowed - Access denied'})
-                        set_led_idle()
-                        play_failure()
-                        cleanup_buzzer()
-                        return {'verified': False, 'reason': 'Student Driver License not allowed'}
-
-            # Handle manual input if both attempts failed
-            if not license_success:
-                last_attempt_had_keywords = keywords_found >= 1
-                
-                if last_attempt_had_keywords:
-                    print(f"\n🤔 MANUAL INPUT OPTION:")
-                    print(f"   License detected but scan quality insufficient")
-                    print(f"   Expected: {user_info.get('name', 'N/A')}")
-                    if actual_license_name:
-                        print(f"   Detected: {actual_license_name}")
-                    
-                    if msgbox.askyesno("Manual Input", 
-                                     f"License scan quality insufficient.\n\n"
-                                     f"Expected: {user_info.get('name', 'N/A')}\n"
-                                     f"Detected: {actual_license_name if actual_license_name else 'Not found'}\n\n"
-                                     f"Enter name manually?"):
-                        
-                        from etc.utils.gui_helpers import get_user_input_gui
-                        
-                        expected_name = user_info.get('name', 'N/A')
-                        manual_name = get_user_input_gui(
-                            f"Expected: {expected_name}\n\nEnter name from license:",
-                            "Manual License Input",
-                            expected_name
-                        )
-                        
-                        if manual_name and manual_name.strip():
-                            manual_name = manual_name.strip().title()
-                            print(f"✅ Manual license input: {manual_name}")
-                            
-                            # Record TIME IN with manual input
-                            if record_time_in(user_info):
-                                timestamp = time.strftime('%H:%M:%S')
-                                status_callback({'current_step': f'✅ TIME IN recorded at {timestamp} (Manual Input)'})
-                                set_led_success(duration=5.0)
-                                play_success()
-                                
-                                result = {
-                                    'verified': True,
-                                    'name': user_info['name'],
-                                    'time_action': 'IN',
-                                    'timestamp': timestamp,
-                                    'manual_input': True,
-                                    'manual_name': manual_name
-                                }
-                                cleanup_buzzer()
-                                return result
-                            else:
-                                status_callback({'current_step': '❌ Failed to record time'})
-                                set_led_idle()
-                                play_failure()
-                                cleanup_buzzer()
-                                return {'verified': False, 'reason': 'Failed to record time'}
-                        else:
-                            print("❌ Manual input cancelled or empty")
-                            cleanup_buzzer()
-                            return {'verified': False, 'reason': 'Manual input cancelled'}
-                    else:
-                        cleanup_buzzer()
-                        return {'verified': False, 'reason': 'Manual input declined'}
-                else:
-                    print("❌ No valid license detected in either attempt")
-                    cleanup_buzzer()
-                    return {'verified': False, 'reason': 'No valid license detected'}
-
-            # ONLY run verification flow if license captured successfully
-            if license_success and image_path:
-                status_callback({'current_step': '🔍 Verifying license against fingerprint...'})
+                if not current_image_path:
+                    # Camera capture failed - likely Student Permit detected in preview
+                    print("❌ Student Driver License likely detected in camera preview")
+                    status_callback({'current_step': '❌ Student Driver License not allowed - Access denied'})
+                    set_led_idle()
+                    play_failure()
+                    return {'verified': False, 'reason': 'Student Driver License not allowed'}
                 
                 try:
+                    # Run verification flow
                     verification_result = complete_verification_flow(
-                        image_path=image_path,
+                        image_path=current_image_path,
                         fingerprint_info=fingerprint_info,
                         helmet_verified=True,
                         license_expiration_valid=license_expiration_valid
                     )
+                    
+                    if verification_result:
+                        # SUCCESS - License matched
+                        license_success = True
+                        break
+                        
+                    else:
+                        # FAILED - Check if we should try again or go to manual input
+                        if attempt == 0:
+                            # First attempt failed - auto retry
+                            print(f"⚠️ FIRST ATTEMPT FAILED - Auto-retrying...")
+                            status_callback({'current_step': '🔄 Auto-retrying license scan...'})
+                            continue
+                        else:
+                            # Second attempt failed - PRESERVE the image file for manual input
+                            print(f"\n🤔 MANUAL INPUT OPTION:")
+                            print(f"   Second attempt verification failed")
+                            print(f"   Expected: {user_info.get('name', 'N/A')}")
+                            
+                            # Extract name from current image - file should still be accessible
+                            display_name = "Processing error"
+                            actual_license_name = None
+                            
+                            try:
+                                if current_image_path and os.path.exists(current_image_path):
+                                    print(f"   📁 Processing image: {os.path.basename(current_image_path)}")
+                                    ocr_text = extract_text_from_image(current_image_path)
+                                    actual_license_name = _detect_name_pattern(ocr_text)
+                                    
+                                    if actual_license_name:
+                                        print(f"   Detected: {actual_license_name}")
+                                        display_name = actual_license_name
+                                    else:
+                                        print(f"   Detected: No name found (scanning issue)")
+                                        display_name = "No name detected"
+                                else:
+                                    print(f"   ❌ Image file not found: {current_image_path}")
+                                    display_name = "File not found"
+                                    
+                            except Exception as e:
+                                print(f"   ⚠️ Name extraction error: {e}")
+                                display_name = "OCR processing error"
+                            
+                            # Show what we're working with
+                            print(f"   📝 Manual input will show: '{display_name}'")
+                            
+                            # Process manual input attempts
+                            manual_success = False
+                            
+                            # First manual input attempt
+                            print(f"\n🔤 MANUAL INPUT ATTEMPT 1/2")
+                            manual_name = get_manual_name_input(
+                                user_info.get('name', 'N/A'),
+                                display_name,
+                                status_callback
+                            )
+                            
+                            if manual_name and manual_name.strip():
+                                manual_name = manual_name.strip().title()
+                                expected_name = user_info.get('name', '').title()
+                                
+                                print(f"   👤 User entered: '{manual_name}'")
+                                print(f"   🎯 Expected: '{expected_name}'")
+                                
+                                if manual_name == expected_name:
+                                    # First manual input successful
+                                    print(f"✅ Manual input successful on first attempt")
+                                    manual_success = True
+                                    final_result = {
+                                        'verified': True,
+                                        'name': user_info['name'],
+                                        'time_action': 'IN',
+                                        'manual_override': True,
+                                        'manual_name': manual_name
+                                    }
+                                else:
+                                    # First manual input failed - give second chance
+                                    print(f"❌ Manual input attempt 1 failed: Names don't match")
+                                    print(f"🔤 MANUAL INPUT ATTEMPT 2/2 (Last Chance)")
+                                    
+                                    second_manual_name = get_manual_name_input(
+                                        user_info.get('name', 'N/A'),
+                                        display_name,  # Show same detected name
+                                        status_callback,
+                                        attempt_number=2
+                                    )
+                                    
+                                    if second_manual_name and second_manual_name.strip():
+                                        second_manual_name = second_manual_name.strip().title()
+                                        
+                                        print(f"   👤 User entered: '{second_manual_name}'")
+                                        print(f"   🎯 Expected: '{expected_name}'")
+                                        
+                                        if second_manual_name == expected_name:
+                                            # Second manual input successful
+                                            print(f"✅ Manual input successful on second attempt")
+                                            manual_success = True
+                                            final_result = {
+                                                'verified': True,
+                                                'name': user_info['name'],
+                                                'time_action': 'IN',
+                                                'manual_override': True,
+                                                'manual_name': second_manual_name
+                                            }
+                                        else:
+                                            # Both manual attempts failed
+                                            print(f"❌ Manual input attempt 2 failed: Names don't match")
+                                            print("❌ Manual override DENIED - Both attempts failed")
+                                    else:
+                                        # Second manual input cancelled
+                                        print("❌ Manual input attempt 2 cancelled")
+                            else:
+                                # First manual input cancelled
+                                print("❌ Manual input attempt 1 cancelled")
+                            
+                            # Clean up image file AFTER manual input processing
+                            if current_image_path and os.path.exists(current_image_path):
+                                try:
+                                    os.remove(current_image_path)
+                                    print(f"   🗑️ Cleaned up image file")
+                                except:
+                                    pass
+                            
+                            # Handle manual input results
+                            if manual_success:
+                                license_success = True
+                                break
+                            else:
+                                return {'verified': False, 'reason': 'Manual override failed'}
+                
                 except ValueError as e:
                     if "STUDENT_PERMIT_DETECTED" in str(e):
-                        status_callback({'current_step': '❌ Student Driver License detected - Access denied'})
+                        status_callback({'current_step': '❌ Student Permit detected - Access denied'})
                         set_led_idle()
                         play_failure()
-                        cleanup_buzzer()
-                        return {'verified': False, 'reason': 'Student Driver License not allowed'}
+                        # Clean up and return failure
+                        if current_image_path and os.path.exists(current_image_path):
+                            try:
+                                os.remove(current_image_path)
+                            except:
+                                pass
+                        return {'verified': False, 'reason': 'Student Permit not allowed'}
                     else:
                         raise e
-                
-                # Show verification summary
-                verification_summary = {
-                    'helmet': True,
-                    'fingerprint': True,
-                    'license_valid': license_expiration_valid,
-                    'license_detected': verification_result,
-                    'name_match': verification_result
-                }
-                status_callback({'verification_summary': verification_summary})
-                
-                if verification_result:
-                    # Record TIME IN
+
+            # Final cleanup - only if we didn't already clean up during manual input
+            if current_image_path and os.path.exists(current_image_path):
+                try:
+                    os.remove(current_image_path)
+                    print(f"🗑️ Final cleanup of image file")
+                except:
+                    pass
+
+            # Handle successful verification
+            if license_success:
+                # Use final_result if it was set by manual input, otherwise create standard result
+                if final_result:
+                    if record_time_in(user_info):
+                        timestamp = time.strftime('%H:%M:%S')
+                        status_callback({'current_step': f'✅ TIME IN recorded at {timestamp} (Manual Override)'})
+                        final_result['timestamp'] = timestamp
+                        set_led_success(duration=5.0)
+                        play_success()
+                        result = final_result
+                    else:
+                        status_callback({'current_step': '❌ Failed to record TIME IN'})
+                        set_led_idle()
+                        play_failure()
+                        result = {'verified': False, 'reason': 'Failed to record TIME IN'}
+                else:
+                    # Standard verification success
+                    verification_summary = {
+                        'helmet': True,
+                        'fingerprint': True,
+                        'license_valid': license_expiration_valid,
+                        'license_detected': True,
+                        'name_match': True
+                    }
+                    status_callback({'verification_summary': verification_summary})
+                    
                     if record_time_in(user_info):
                         timestamp = time.strftime('%H:%M:%S')
                         status_callback({'current_step': f'✅ TIME IN recorded at {timestamp}'})
                         set_led_success(duration=5.0)
                         play_success()
-                        
                         result = {
                             'verified': True,
                             'name': user_info['name'],
@@ -412,80 +427,10 @@ def run_verification_with_gui(status_callback):
                         set_led_idle()
                         play_failure()
                         result = {'verified': False, 'reason': 'Failed to record TIME IN'}
-                else:
-                    print("\n🤔 VERIFICATION FAILED - OPENING MANUAL INPUT DIALOG:")
-                    print("   License detected but names don't match closely enough")
-                    print(f"   Expected: {user_info.get('name', 'N/A')}")
-                    if actual_license_name:
-                        print(f"   License shows: {actual_license_name}")
-                    
-                    try:
-                        manual_attempts = 0
-                        max_manual_attempts = 2
-                        manual_success = False
-                        
-                        while manual_attempts < max_manual_attempts and not manual_success:
-                            manual_attempts += 1
-                            
-                            # Use the new dialog helper
-                            manual_name = get_manual_name_input(
-                                user_info.get('name', 'N/A'),
-                                actual_license_name,
-                                status_callback
-                            )
-                            
-                            if manual_name and manual_name.strip():
-                                manual_name = manual_name.strip().title()
-                                expected_name = user_info.get('name', '').title()
-                                
-                                # Check if names match exactly
-                                if manual_name == expected_name:
-                                    print(f"✅ Manual override accepted: Names match exactly")
-                                    manual_success = True
-                                    
-                                    if record_time_in(user_info):
-                                        timestamp = time.strftime('%H:%M:%S')
-                                        status_callback({'current_step': f'✅ TIME IN recorded at {timestamp} (Manual Override)'})
-                                        set_led_success(duration=5.0)
-                                        play_success()
-                                        
-                                        result = {
-                                            'verified': True,
-                                            'name': user_info['name'],
-                                            'time_action': 'IN',
-                                            'timestamp': timestamp,
-                                            'manual_override': True,
-                                            'manual_name': manual_name
-                                        }
-                                    else:
-                                        status_callback({'current_step': '❌ Failed to record time'})
-                                        set_led_idle()
-                                        play_failure()
-                                        result = {'verified': False, 'reason': 'Failed to record time'}
-                                else:
-                                    # Name doesn't match
-                                    print(f"❌ Manual attempt {manual_attempts} failed: Name doesn't match")
-                                    
-                                    if manual_attempts >= max_manual_attempts:
-                                        status_callback({'current_step': '❌ Manual override failed after 2 attempts'})
-                                        set_led_idle()
-                                        play_failure()
-                                        result = {'verified': False, 'reason': 'Manual override failed - name mismatch after 2 attempts'}
-                            else:
-                                # User cancelled
-                                print(f"❌ Manual attempt {manual_attempts} cancelled")
-                                status_callback({'current_step': '❌ Manual override cancelled'})
-                                set_led_idle()
-                                play_failure()
-                                result = {'verified': False, 'reason': 'Manual override cancelled'}
-                                break
-                    
-                    except Exception as e:
-                        print(f"❌ ERROR in manual override: {e}")
-                        status_callback({'current_step': '❌ Manual override failed'})
-                        set_led_idle()
-                        play_failure()
-                        result = {'verified': False, 'reason': f'Manual override error: {str(e)}'}
+
+            # If we reach here, verification completely failed
+            if not result.get('verified', False):
+                result = {'verified': False, 'reason': 'License verification failed'}
     
     finally:
         cleanup_buzzer()

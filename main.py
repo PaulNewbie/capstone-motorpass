@@ -1,6 +1,8 @@
 # main.py - Simple fix with cleanup calls added
-import os
+import subprocess
 import sys
+import os
+import time
 from etc.ui.main_window import MotorPassGUI
 
 # Import controllers

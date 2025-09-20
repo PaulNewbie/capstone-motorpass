@@ -6,8 +6,8 @@ SYSTEM_VERSION = "1.5"
 # =============================================================================
 # 🛠️ SIMPLE DEV MODE - Just change True/False
 # =============================================================================
-ENABLE_BUZZER = True    # Set to False to disable buzzer
-ENABLE_LED = True     # Set to False to disable LED
+ENABLE_BUZZER = False    # Set to False to disable buzzer
+ENABLE_LED = False     # Set to False to disable LED
 
 # =============================================================================
 # FILE PATHS CONFIGURATION - Centralized JSON file paths
