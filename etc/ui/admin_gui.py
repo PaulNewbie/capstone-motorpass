@@ -592,7 +592,7 @@ class AdminPanelGUI:
         close_btn.pack(pady=10)
 
     def create_office_management_section(self, parent):
-        """Add office management to admin panel - RESPONSIVE"""
+        """Add office management to admin panel - RESPONSIVE with 4-digit codes"""
         try:
             from database.office_operation import get_all_offices, add_office, update_office_code, delete_office
         except ImportError:
@@ -604,6 +604,13 @@ class AdminPanelGUI:
                     font=("Arial", error_font_size, "bold"), fg=self.colors['accent'], 
                     bg=self.colors['white']).pack(pady=20)
             return
+        
+        # FIRST: Ensure the offices table exists
+        try:
+            from database.office_operation import create_office_table
+            create_office_table()  # This will create the table if it doesn't exist
+        except Exception as e:
+            print(f"❌ Error creating office table: {e}")
         
         # Responsive fonts
         section_font_size = max(10, int(self.display_size / 80))
@@ -617,9 +624,9 @@ class AdminPanelGUI:
                                     relief="ridge", bd=2)
         office_frame.pack(fill="x", padx=8, pady=4)
         
-        # Instructions
+        # Instructions - UPDATED TO 4-DIGIT
         instruction_label = tk.Label(office_frame, 
-                                    text="Manage visitor offices and their 3-digit security codes for timeout verification",
+                                    text="Manage visitor offices and their 4-digit security codes for timeout verification",
                                     font=("Arial", instruction_font_size), fg=self.colors['secondary'],
                                     bg=self.colors['white'])
         instruction_label.pack(pady=(8, 0))
@@ -637,6 +644,7 @@ class AdminPanelGUI:
         scrollbar.pack(side="right", fill="y")
         
         def refresh_office_list():
+            """Refresh the office list display"""
             offices_list.delete(0, tk.END)
             offices = get_all_offices()
             for office in offices:
@@ -647,15 +655,18 @@ class AdminPanelGUI:
         btn_frame.pack(fill="x", padx=8, pady=(0, 8))
         
         def add_new_office():
+            """Add a new office with auto-generated 4-digit code"""
             office_name = simpledialog.askstring("Add Office", "Enter office name:")
             if office_name and office_name.strip():
                 if add_office(office_name.strip()):
-                    messagebox.showinfo("Success", f"Office '{office_name}' added successfully!\nA unique 3-digit code has been generated.")
+                    # UPDATED MESSAGE TO 4-DIGIT
+                    messagebox.showinfo("Success", f"Office '{office_name}' added successfully!\nA unique 4-digit code has been generated.")
                     refresh_office_list()
                 else:
                     messagebox.showerror("Error", "Failed to add office!")
         
         def update_office_code_gui():
+            """Update the security code for selected office"""
             selection = offices_list.curselection()
             if not selection:
                 messagebox.showwarning("Warning", "Please select an office first!")
@@ -665,16 +676,19 @@ class AdminPanelGUI:
             office_name = office_text.split(" (Code:")[0]
             current_code = office_text.split("Code: ")[1].replace(")", "")
             
+            # UPDATED DIALOG TO 4-DIGIT
             new_code = simpledialog.askstring("Update Security Code", 
-                                             f"Current code for '{office_name}': {current_code}\n\nEnter new 3-digit code:")
+                                             f"Current code for '{office_name}': {current_code}\n\nEnter new 4-digit code:")
             if new_code and new_code.strip():
                 if update_office_code(office_name, new_code.strip()):
                     messagebox.showinfo("Success", f"Security code updated for '{office_name}'!")
                     refresh_office_list()
                 else:
-                    messagebox.showerror("Error", "Failed to update code! Make sure it's exactly 3 digits and not already in use.")
+                    # UPDATED ERROR MESSAGE TO 4-DIGIT
+                    messagebox.showerror("Error", "Failed to update code! Make sure it's exactly 4 digits and not already in use.")
         
         def delete_office_gui():
+            """Delete (deactivate) the selected office"""
             selection = offices_list.curselection()
             if not selection:
                 messagebox.showwarning("Warning", "Please select an office first!")
@@ -702,7 +716,8 @@ class AdminPanelGUI:
             for office in offices:
                 codes_text += f"• {office['office_name']}: {office['office_code']}\n"
             
-            codes_text += "\n⚠️ These codes are used for secure guest timeout verification."
+            # UPDATED MESSAGE TO 4-DIGIT
+            codes_text += "\n⚠️ These 4-digit codes are used for secure guest timeout verification."
             
             # Create a window to display codes - responsive
             codes_window = tk.Toplevel(self.root)

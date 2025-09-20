@@ -21,16 +21,16 @@ def create_office_table():
             )
         ''')
         
-        # Insert default offices with codes
+        # Insert default offices with 4-digit codes - UPDATED
         default_offices = [
-            ("IT Department", "248"),
-            ("SDO Office", "573"),
-            ("Library", "691"),
-            ("Registrar", "314"),
-            ("CSS Department", "827"),
-            ("Dean's Office", "459"),
-            ("Cashier Office", "136"),
-            ("Main Office", "705")
+            ("IT Department", "2481"),
+            ("SDO Office", "5739"),
+            ("Library", "6912"),
+            ("Registrar", "3147"),
+            ("CSS Department", "8275"),
+            ("Dean's Office", "4593"),
+            ("Cashier Office", "1368"),
+            ("Main Office", "7054")
         ]
         
         for office_name, code in default_offices:
@@ -85,7 +85,8 @@ def verify_office_code(office_name: str, entered_code: str) -> bool:
         
         cursor.execute('''
             SELECT office_code FROM offices 
-            WHERE office_name = ? AND is_active = 1
+            WHERE office_name = ?
+            AND is_active = 1
         ''', (office_name,))
         
         row = cursor.fetchone()
@@ -100,14 +101,14 @@ def verify_office_code(office_name: str, entered_code: str) -> bool:
         return False
 
 def add_office(office_name: str) -> bool:
-    """Add new office with auto-generated code"""
+    """Add new office with auto-generated 4-digit code"""
     try:
         conn = sqlite3.connect(MOTORPASS_DB)
         cursor = conn.cursor()
         
-        # Generate unique 3-digit code
+        # Generate unique 4-digit code - UPDATED
         while True:
-            code = f"{random.randint(100, 999)}"
+            code = f"{random.randint(1000, 9999)}"
             cursor.execute('SELECT office_id FROM offices WHERE office_code = ?', (code,))
             if not cursor.fetchone():
                 break
@@ -129,8 +130,9 @@ def add_office(office_name: str) -> bool:
 def update_office_code(office_name: str, new_code: str) -> bool:
     """Update office security code"""
     try:
-        if not new_code.isdigit() or len(new_code) != 3:
-            print("❌ Code must be exactly 3 digits")
+        # UPDATED TO 4-DIGIT VALIDATION
+        if not new_code.isdigit() or len(new_code) != 4:
+            print("❌ Code must be exactly 4 digits")
             return False
         
         conn = sqlite3.connect(MOTORPASS_DB)

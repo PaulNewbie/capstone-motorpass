@@ -102,7 +102,7 @@ def admin_view_enrolled():
             print(f"🎓 Student ID: {info.get('student_id', 'N/A')}")
             print(f"📚 Course: {info.get('course', 'N/A')}")
         elif user_type == 'STAFF':
-            print(f"👔 Staff No.: {info.get('staff_no', 'N/A')}")
+            print(f"👔 ID No.: {info.get('staff_no', 'N/A')}")
             print(f"💼 Role: {info.get('staff_role', 'N/A')}")
         
         print(f"🪪 License: {info.get('license_number', 'N/A')}")
@@ -223,6 +223,12 @@ def admin_sync_database():
         
         sheet = client.open(sheet_name).sheet1
         rows = sheet.get_all_records()
+        print("🔍 DEBUG: Raw data from Google Sheets:")
+        for i, row in enumerate(rows):
+            print(f"Row {i+1}: {row}")
+            if i > 5:  # Only show first 5 rows
+                print("... (truncated)")
+                break
         
         print(f"📋 Found {len(rows)} records in Google Sheets")
         
@@ -246,7 +252,7 @@ def admin_sync_database():
                 course = row.get('Course', '').strip()
                 student_id = row.get('Student No.', '').strip()
                 staff_role = row.get('Staff Role', '').strip()
-                staff_no = str(row.get('Staff No.', '')).strip()
+                staff_no = str(row.get('ID No.', '')).strip()
                 
                 # Skip if no name
                 if not full_name:
@@ -277,7 +283,7 @@ def admin_sync_database():
                     
                 elif student_id and staff_no:
                     # Both filled - handle as student by default
-                    print(f"⚠️ Both Student No. and Staff No. filled for {full_name}, treating as student")
+                    print(f"⚠️ Both Student No. and ID No. filled for {full_name}, treating as student")
                     cursor.execute('''
                         INSERT OR REPLACE INTO students 
                         (student_id, full_name, course, license_number, 
@@ -288,7 +294,7 @@ def admin_sync_database():
                     students_added += 1
                 else:
                     # Neither student nor staff ID
-                    print(f"⚠️ Skipping {full_name} - No Student No. or Staff No.")
+                    print(f"⚠️ Skipping {full_name} - No Student No. or ID No.")
                     errors += 1
                     
             except Exception as e:

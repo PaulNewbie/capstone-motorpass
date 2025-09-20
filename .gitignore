@@ -23,6 +23,7 @@ cache/ocr
 
 *motorpass.db
 database/motorpass.db
+MotorPass/database/motorpass.db
 
 *node_modules/
 *node_modules

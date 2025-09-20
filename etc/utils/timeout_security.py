@@ -60,9 +60,9 @@ def timeout_security_verification(guest_info, max_attempts=3):
                            font=("Arial", 12), fg="#666666", bg="#FFFFFF")
     office_label.pack(pady=(0, 20))
     
-    # Instructions
+    # Instructions - UPDATED TO 4-DIGIT
     instruction_label = tk.Label(main_frame, 
-                                text="Enter the 3-digit code provided by\nthe office personnel:", 
+                                text="Enter the 4-digit code provided by\nthe office personnel:", 
                                 font=("Arial", 11), fg="#333333", bg="#FFFFFF", justify="center")
     instruction_label.pack(pady=(0, 15))
     
@@ -89,9 +89,10 @@ def timeout_security_verification(guest_info, max_attempts=3):
             security_window.lift()
             return
         
-        if len(entered_code) != 3 or not entered_code.isdigit():
+        # UPDATED TO 4-DIGIT VALIDATION
+        if len(entered_code) != 4 or not entered_code.isdigit():
             security_window.attributes('-topmost', False)
-            messagebox.showerror("Error", "Code must be exactly 3 digits!")
+            messagebox.showerror("Error", "Code must be exactly 4 digits!")
             code_entry.delete(0, tk.END)
             security_window.attributes('-topmost', True)
             security_window.lift()
@@ -121,42 +122,35 @@ def timeout_security_verification(guest_info, max_attempts=3):
                                    "Maximum attempts exceeded!\n" +
                                    "Possible intruder detected.\n" +
                                    "Timeout DENIED.")
-                security_window.attributes('-topmost', True)
-                security_window.lift()
                 security_window.destroy()
     
-    def cancel_timeout():
+    def cancel_verification():
         result[0] = False
         security_window.destroy()
     
-    # Buttons
+    # Buttons frame
     button_frame = tk.Frame(main_frame, bg="#FFFFFF")
     button_frame.pack(fill="x", pady=(10, 0))
     
-    cancel_button = tk.Button(button_frame, text="❌ Cancel", 
-                             font=("Arial", 10, "bold"), bg="#FF6B6B", fg="white",
-                             padx=20, pady=8, command=cancel_timeout, cursor="hand2")
-    cancel_button.pack(side="left")
+    # Verify button
+    verify_btn = tk.Button(button_frame, text="Verify Code", command=verify_code,
+                          font=("Arial", 12, "bold"), bg="#27AE60", fg="white",
+                          relief="flat", padx=20, pady=8)
+    verify_btn.pack(side="left", padx=(0, 10))
     
-    verify_button = tk.Button(button_frame, text="🔍 Verify Code", 
-                             font=("Arial", 10, "bold"), bg="#4CAF50", fg="white",
-                             padx=20, pady=8, command=verify_code, cursor="hand2")
-    verify_button.pack(side="right")
-    
-    # Enter key binding
-    code_entry.bind('<Return>', lambda event: verify_code())
+    # Cancel button  
+    cancel_btn = tk.Button(button_frame, text="Cancel", command=cancel_verification,
+                          font=("Arial", 12), bg="#E74C3C", fg="white",
+                          relief="flat", padx=20, pady=8)
+    cancel_btn.pack(side="right")
     
     # Focus on code entry
     code_entry.focus_set()
     
-    # Window close handler
-    def on_window_close():
-        result[0] = False
-        security_window.destroy()
+    # Bind Enter key to verify
+    code_entry.bind('<Return>', lambda e: verify_code())
     
-    security_window.protocol("WM_DELETE_WINDOW", on_window_close)
-    
-    # Wait for result
+    # Wait for window to close
     security_window.wait_window()
     
     return result[0] if result[0] is not None else False
