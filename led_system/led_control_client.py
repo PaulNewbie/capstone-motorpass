@@ -114,10 +114,7 @@ class LEDClient:
 _led_client = None
 
 def init_led_system(red_pin=18, green_pin=16):
-    """
-    Initialize LED client system
-    red_pin and green_pin kept for compatibility but not used with daemon
-    """
+    """Initialize LED client system"""
     global _led_client
     
     if _led_client is None:
@@ -133,7 +130,10 @@ def init_led_system(red_pin=18, green_pin=16):
     
     return available
 
-# Your existing function names - COMPLETELY UNCHANGED!
+# =============================================================================
+# BASIC LED STATES
+# =============================================================================
+
 def set_led_idle():
     """Set LED to idle/ready state (blue breathing)"""
     if _led_client and _led_client.is_available():
@@ -152,16 +152,10 @@ def set_led_success(duration=3.0):
         return _led_client.set_state(LEDState.SUCCESS, duration)
     return False
 
-def set_led_failed(duration=3.0):
+def set_led_failed():
     """Set LED to failed state (red solid) with auto-return to idle"""  
     if _led_client and _led_client.is_available():
-        return _led_client.set_state(LEDState.FAILED, duration)
-    return False
-
-def set_led_camera():
-    """Set LED to camera state (white breathing)"""
-    if _led_client and _led_client.is_available():
-        return _led_client.set_state(LEDState.CAMERA)
+        return _led_client.set_state(LEDState.FAILED)
     return False
 
 def set_led_off():
@@ -170,16 +164,9 @@ def set_led_off():
         return _led_client.turn_off()
     return False
 
-def cleanup_led_system():
-    """Clean up LED client system"""
-    global _led_client
-    if _led_client:
-        _led_client.turn_off()
-        _led_client = None
-
-def led_is_available():
-    """Check if LED system is available"""
-    return _led_client and _led_client.is_available()
+# =============================================================================
+# PROGRESS AND FLASH EFFECTS
+# =============================================================================
 
 def led_show_progress(percentage, color=(0, 255, 0)):
     """Show progress ring (0-100%)"""
@@ -205,20 +192,63 @@ def led_flash_warning(times=3):
         return _led_client.quick_flash((255, 165, 0), times)
     return False
 
-# Context manager for automatic LED cleanup  
-class LEDManager:
-    def __init__(self, red_pin=18, green_pin=16):
-        self.red_pin = red_pin
-        self.green_pin = green_pin
-    
-    def __enter__(self):
-        init_led_system(self.red_pin, self.green_pin)
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        cleanup_led_system()
+# =============================================================================
+# CUSTOM FUNCTIONS FOR MOTORPASS
+# =============================================================================
 
-# Status reporting for debugging
+def update_led_progress(elapsed_time, total_time):
+    """Update LED progress - light up LEDs based on time progress"""
+    if not (_led_client and _led_client.is_available()):
+        return False
+        
+    try:
+        # Calculate how many LEDs should be lit (0-12)
+        progress_ratio = elapsed_time / total_time
+        leds_to_light = int(progress_ratio * 12)  # 12 LEDs total
+        leds_to_light = min(leds_to_light, 12)  # Cap at 12
+        
+        # Calculate percentage for the LED daemon
+        percentage = (leds_to_light / 12) * 100
+        
+        return _led_client.show_progress(percentage, (0, 255, 0))
+        
+    except Exception as e:
+        print(f"❌ LED progress update failed: {e}")
+        return False
+
+def set_led_white_lighting():
+    """Set all LEDs to solid bright white for license capture lighting - NO EFFECTS"""
+    if _led_client and _led_client.is_available():
+        # Turn off current state first
+        _led_client.turn_off()
+        time.sleep(0.1)
+        
+        # Use progress at 100% with white color for solid white (no effects)
+        return _led_client.show_progress(100, (255, 255, 255))
+    return False
+
+def set_led_failed_fast_blink():
+    """Fast red blinking for failures"""
+    if _led_client and _led_client.is_available():
+        # Fast red blinking - 5 times, fast speed
+        return _led_client.quick_flash((255, 0, 0), times=5, speed=0.1)
+    return False
+
+# =============================================================================
+# SYSTEM MANAGEMENT
+# =============================================================================
+
+def cleanup_led_system():
+    """Clean up LED client system"""
+    global _led_client
+    if _led_client:
+        _led_client.turn_off()
+        _led_client = None
+
+def led_is_available():
+    """Check if LED system is available"""
+    return _led_client and _led_client.is_available()
+
 def get_led_status():
     """Get LED system status for debugging"""
     if not _led_client:
@@ -237,7 +267,27 @@ def get_led_status():
         'socket_path': _led_client.socket_path
     }
 
-# Demo/test function
+# =============================================================================
+# CONTEXT MANAGER
+# =============================================================================
+
+class LEDManager:
+    """Context manager for automatic LED cleanup"""
+    def __init__(self, red_pin=18, green_pin=16):
+        self.red_pin = red_pin
+        self.green_pin = green_pin
+    
+    def __enter__(self):
+        init_led_system(self.red_pin, self.green_pin)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        cleanup_led_system()
+
+# =============================================================================
+# DEMO/TEST FUNCTION
+# =============================================================================
+
 def demo():
     """Test LED client functionality"""
     print("🌟 MotorPass LED Client Test")
@@ -255,13 +305,13 @@ def demo():
     print("✅ LED client connected to daemon!")
     
     try:
-        # Test all LED states
+        # Test basic states
         test_states = [
-            ('idle', 'Blue breathing (ready)', set_led_idle, 4),
-            ('processing', 'Yellow rotating (scanning)', set_led_processing, 4),
-            ('success', 'Green solid (success)', lambda: set_led_success(3), 4),
-            ('failed', 'Red solid (failed)', lambda: set_led_failed(3), 4),
-            ('camera', 'White breathing (camera)', set_led_camera, 4),
+            ('idle', 'Blue breathing (ready)', set_led_idle, 3),
+            ('processing', 'Yellow rotating (scanning)', set_led_processing, 3),
+            ('success', 'Green solid (success)', lambda: set_led_success(2), 3),
+            ('failed', 'Red solid (failed)', lambda: set_led_failed(2), 3),
+            ('white_lighting', 'White solid (license capture)', set_led_white_lighting, 3),
         ]
         
         for state, description, func, duration in test_states:
@@ -272,30 +322,27 @@ def demo():
                 print(f"   ❌ {state} command failed")
             time.sleep(duration)
         
-        # Test progress ring
-        print(f"\n📊 Testing progress ring...")
-        for i in range(0, 101, 25):
-            print(f"   Progress: {i}%")
-            if led_show_progress(i, (255, 165, 0)):  # Orange progress
-                print(f"   ✅ Progress {i}% sent")
-            time.sleep(1)
+        # Test progress ring (helmet detection simulation)
+        print(f"\n📊 Testing helmet progress...")
+        for i in range(0, 13):  # 0 to 12 LEDs
+            percentage = (i / 12) * 100
+            print(f"   LEDs lit: {i}/12 ({percentage:.0f}%)")
+            if update_led_progress(i * 0.167, 2.0):  # Simulate 2-second detection
+                print(f"   ✅ Progress sent")
+            time.sleep(0.3)
         
         # Test flash effects
         print(f"\n✨ Testing flash effects...")
+        
+        print("   Fast red blink (failure)")
+        if set_led_failed_fast_blink():
+            print("   ✅ Fast blink sent")
+        time.sleep(2)
         
         print("   Success flash (green)")
         if led_flash_success(3):
             print("   ✅ Success flash sent")
         time.sleep(2)
-        
-        print("   Failure flash (red)")
-        if led_flash_failed(3):
-            print("   ✅ Failure flash sent")
-        time.sleep(2)
-        
-        print("   Warning flash (orange)")
-        if led_flash_warning(3):
-            print("   ✅ Warning flash sent")
         
         # Return to idle
         print(f"\n🏠 Returning to idle state...")

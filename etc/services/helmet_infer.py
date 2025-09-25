@@ -5,6 +5,7 @@ import numpy as np
 import onnxruntime as ort
 import time
 from etc.services.hardware.rpi_camera import force_camera_cleanup, CameraContext
+from etc.services.hardware.led_control import update_led_progress, set_led_failed
 
 # === Helmet Detection Config ===
 MODEL_PATH = "best.onnx"
@@ -150,6 +151,7 @@ def verify_helmet():
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                     elif cls_id == 0:  # nutshell
                         nutshell_detected = True
+                        set_led_failed()
                         label = f"Nutshell Helmet - NOT ALLOWED ({conf:.2f})"
                         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
                         cv2.putText(frame, label, (x1, y1 - 10),
@@ -168,8 +170,10 @@ def verify_helmet():
                         
                         # Show countdown on frame
                         progress_text = f"Helmet Verified: {elapsed:.1f}/{HELMET_DETECTION_DURATION}s"
-                        cv2.putText(frame, progress_text, (10, 30),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                        cv2.putText(frame, progress_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                        
+                        draw_percentage_bar(frame, elapsed, HELMET_DETECTION_DURATION)
+                        update_led_progress(elapsed, HELMET_DETECTION_DURATION)
                         
                         if elapsed >= HELMET_DETECTION_DURATION:
                             print("✅ Helmet verification successful!")
@@ -185,6 +189,7 @@ def verify_helmet():
                     if nutshell_detected:
                         status_text = "NUTSHELL HELMET NOT ALLOWED"
                         status_color = (0, 0, 255)
+                        set_led_failed
                     else:
                         status_text = "Please wear FULL-FACE HELMET"
                         status_color = (0, 165, 255)
@@ -215,3 +220,31 @@ def verify_helmet():
     
     # Context manager handles cleanup automatically
     return result
+    
+def draw_percentage_bar(frame, elapsed, total_duration):
+    """Draw simple percentage progress bar"""
+    height, width = frame.shape[:2]
+    percentage = min((elapsed / total_duration) * 100, 100)
+    
+    # Progress bar dimensions 
+    bar_width = 600
+    bar_height = 35
+    bar_x = (width - bar_width) // 2
+    bar_y = height - 80
+    
+    # Background bar
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (50, 50, 50), -1)
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (255, 255, 255), 2)
+    
+    # Progress fill
+    fill_width = int((percentage / 100) * bar_width)
+    if fill_width > 0:
+        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + fill_width, bar_y + bar_height), (0, 255, 0), -1)
+    
+    # Percentage text - BIGGER FONT
+    percent_text = f"{percentage:.0f}%"
+    text_size = cv2.getTextSize(percent_text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 3)[0]
+    text_x = (width - text_size[0]) // 2
+    cv2.putText(frame, percent_text, (text_x, bar_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
+
+

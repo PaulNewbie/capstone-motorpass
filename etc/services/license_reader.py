@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 from etc.services.hardware.rpi_camera import get_camera
+from etc.services.hardware.led_control import set_led_white_lighting
 
 # ============== CONFIGURATION ==============
 
@@ -755,7 +756,9 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
     camera = get_camera()
     if not camera.initialized:
         return None
-    
+        
+    set_led_white_lighting()
+     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     prefix = f"motorpass_license_{fingerprint_info.get('student_id', 'guest')}_{timestamp}" if fingerprint_info else f"motorpass_license_{timestamp}"
     

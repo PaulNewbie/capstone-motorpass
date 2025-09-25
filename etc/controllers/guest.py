@@ -59,6 +59,7 @@ def run_guest_verification_with_gui(status_callback):
             status_callback({'current_step': '❌ Helmet verification failed'})
             set_led_idle()
             play_failure()
+            set_led_failed_fast_blink()
             cleanup_buzzer()
             return {'verified': False, 'reason': 'Helmet verification failed'}
         
@@ -83,6 +84,7 @@ def run_guest_verification_with_gui(status_callback):
                 status_callback({'current_step': '❌ License capture failed'})
                 set_led_idle()
                 play_failure()
+                set_led_failed_fast_blink()
                 cleanup_buzzer()
                 return {'verified': False, 'reason': 'License capture failed'}
             
@@ -101,6 +103,7 @@ def run_guest_verification_with_gui(status_callback):
                     safe_delete_temp_file(image_path)
                     set_led_idle()
                     play_failure()
+                    set_led_failed_fast_blink()
                     cleanup_buzzer()
                     return {'verified': False, 'reason': 'Student Permit not allowed'}
                 else:
@@ -169,6 +172,7 @@ def run_guest_verification_with_gui(status_callback):
                         status_callback({'current_step': '❌ Failed to record TIME OUT'})
                         set_led_idle()
                         play_failure()
+                        set_led_failed_fast_blink()
                         cleanup_buzzer()
                         safe_delete_temp_file(image_path)
                         return {'verified': False, 'reason': 'Failed to record TIME OUT'}
@@ -180,6 +184,7 @@ def run_guest_verification_with_gui(status_callback):
                     safe_delete_temp_file(image_path)
                     set_led_idle()
                     play_failure()
+                    set_led_failed_fast_blink()
                     cleanup_buzzer()
                     return {'verified': False, 'reason': 'Security verification failed'}
             
@@ -211,6 +216,7 @@ def run_guest_verification_with_gui(status_callback):
                     safe_delete_temp_file(image_path)
                     set_led_idle()
                     play_failure()
+                    set_led_failed_fast_blink()
                     cleanup_buzzer()
                     return {'verified': False, 'reason': 'Guest registration cancelled'}
                 
@@ -246,6 +252,7 @@ def run_guest_verification_with_gui(status_callback):
                         status_callback({'current_step': '❌ Student Permit detected - Access denied'})
                         set_led_idle()
                         play_failure()
+                        set_led_failed_fast_blink()
                         cleanup_buzzer()
                         safe_delete_temp_file(image_path)
                         return {'verified': False, 'reason': 'Student Permit not allowed'}
@@ -283,6 +290,7 @@ def run_guest_verification_with_gui(status_callback):
                         status_callback({'current_step': '❌ Failed to record TIME IN'})
                         set_led_idle()
                         play_failure()
+                        set_led_failed_fast_blink()
                         cleanup_buzzer()
                         safe_delete_temp_file(image_path)
                         return {'verified': False, 'reason': 'Failed to record TIME IN'}
@@ -290,6 +298,7 @@ def run_guest_verification_with_gui(status_callback):
                     status_callback({'current_step': '❌ Guest verification failed'})
                     set_led_idle()
                     play_failure()
+                    set_led_failed_fast_blink()
                     cleanup_buzzer()
                     safe_delete_temp_file(image_path)
                     return {'verified': False, 'reason': 'License verification failed'}
@@ -298,6 +307,7 @@ def run_guest_verification_with_gui(status_callback):
         print(f"❌ Error during verification: {e}")
         set_led_idle()
         play_failure()
+        set_led_failed_fast_blink()
         cleanup_buzzer()
         return {'verified': False, 'reason': str(e)}
                       

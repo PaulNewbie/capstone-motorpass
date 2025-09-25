@@ -7,7 +7,7 @@ SYSTEM_VERSION = "1.5"
 # 🛠️ SIMPLE DEV MODE - Just change True/False
 # =============================================================================
 ENABLE_BUZZER = False    # Set to False to disable buzzer
-ENABLE_LED = True        # Set to True for WS281X LED Ring
+ENABLE_LED = False        # Set to True for WS281X LED Ring
 
 # =============================================================================
 # FILE PATHS CONFIGURATION - Centralized JSON file paths
@@ -25,36 +25,12 @@ RPI_CAMERA_RESOLUTION = (1280, 720)  # HD resolution for RPi Camera 3
 RPI_CAMERA_FRAMERATE = 50
 RPI_CAMERA_WARMUP_TIME = 1  # seconds
 
-# =============================================================================
-# WS281X LED RING CONFIGURATION
-# =============================================================================
-WS281X_CONFIG = {
-    'LED_COUNT': 12,         # Number of LEDs in ring
-    'LED_PIN': 18,           # GPIO pin (must support PWM)
-    'LED_FREQ_HZ': 800000,   # LED signal frequency in Hz
-    'LED_DMA': 10,           # DMA channel to use
-    'LED_BRIGHTNESS': 76,    # LED brightness (0-255)
-    'LED_INVERT': False,     # Invert the signal
-    'LED_CHANNEL': 0,        # PWM channel (0 or 1)
-}
-
-# LED State Colors (R, G, B)
-LED_COLORS = {
-    'READY': (0, 0, 255),        # Blue - system ready
-    'SCANNING': (255, 255, 0),   # Yellow - fingerprint scanning
-    'PROCESSING': (255, 165, 0), # Orange - processing data
-    'SUCCESS': (0, 255, 0),      # Green - operation successful
-    'FAILED': (255, 0, 0),       # Red - operation failed
-    'CAMERA': (255, 255, 255),   # White - camera active
-    'OFF': (0, 0, 0)             # Off - no light
-}
 
 # =============================================================================
 # HARDWARE PIN CONFIGURATION (Legacy - kept for compatibility)
 # =============================================================================
 HARDWARE_PINS = {
-    'LED_RED_PIN': 18,      # Now used for WS281X data pin
-    'LED_GREEN_PIN': 16,    # Legacy - not used with WS281X
+    'LED_PIN': 18,    # Now used for WS281X data pin  
     'BUZZER_PIN': 22
 }
 
@@ -85,13 +61,3 @@ ADMIN_MENU = {
     ]
 }
 
-# =============================================================================
-# SYSTEM REQUIREMENTS NOTICE
-# =============================================================================
-LED_REQUIREMENTS_MESSAGE = """
-🌟 WS281X LED Ring Requirements:
-• Run with sudo: sudo ~/myvenv/bin/python3 main.py
-• Install library: sudo pip install rpi_ws281x
-• Use PWM-capable GPIO pin (default: GPIO 18)
-• Connect: Data->GPIO18, +5V->5V, GND->GND
-"""

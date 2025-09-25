@@ -72,6 +72,7 @@ def run_verification_with_gui(status_callback):
             status_callback({'current_step': '❌ Helmet verification failed'})
             set_led_idle()
             play_failure()
+            set_led_failed_fast_blink()
             cleanup_buzzer()
             return {'verified': False, 'reason': 'Helmet verification failed'}
         
@@ -90,6 +91,7 @@ def run_verification_with_gui(status_callback):
             status_callback({'current_step': '❌ Fingerprint authentication failed - Access Denied'})
             set_led_idle()
             play_failure()
+            set_led_failed_fast_blink()
             cleanup_buzzer()
             return {'verified': False, 'reason': 'Fingerprint authentication failed after 5 attempts'}
         
@@ -135,6 +137,7 @@ def run_verification_with_gui(status_callback):
                 status_callback({'current_step': '❌ Failed to record TIME OUT'})
                 set_led_idle()
                 play_failure()
+                set_led_failed_fast_blink()
                 result = {'verified': False, 'reason': 'Failed to record TIME OUT'}
                 
         else:
@@ -174,6 +177,7 @@ def run_verification_with_gui(status_callback):
                 })
                 set_led_idle()
                 play_failure()
+                set_led_failed_fast_blink()
                 cleanup_buzzer()
                 return {'verified': False, 'reason': 'License has expired'}
             
@@ -220,6 +224,7 @@ def run_verification_with_gui(status_callback):
                     status_callback({'current_step': '❌ Student Driver License not allowed - Access denied'})
                     set_led_idle()
                     play_failure()
+                    set_led_failed_fast_blink()
                     return {'verified': False, 'reason': 'Student Driver License not allowed'}
                 
                 try:
@@ -365,6 +370,7 @@ def run_verification_with_gui(status_callback):
                         status_callback({'current_step': '❌ Student Permit detected - Access denied'})
                         set_led_idle()
                         play_failure()
+                        set_led_failed_fast_blink()
                         # Clean up and return failure
                         if current_image_path and os.path.exists(current_image_path):
                             try:
@@ -398,6 +404,7 @@ def run_verification_with_gui(status_callback):
                         status_callback({'current_step': '❌ Failed to record TIME IN'})
                         set_led_idle()
                         play_failure()
+                        set_led_failed_fast_blink()
                         result = {'verified': False, 'reason': 'Failed to record TIME IN'}
                 else:
                     # Standard verification success
@@ -426,6 +433,7 @@ def run_verification_with_gui(status_callback):
                         status_callback({'current_step': '❌ Failed to record TIME IN'})
                         set_led_idle()
                         play_failure()
+                        set_led_failed_fast_blink()
                         result = {'verified': False, 'reason': 'Failed to record TIME IN'}
 
             # If we reach here, verification completely failed
