@@ -592,204 +592,287 @@ class AdminPanelGUI:
         close_btn.pack(pady=10)
 
     def create_office_management_section(self, parent):
-        """Add office management to admin panel - RESPONSIVE with 4-digit codes"""
-        try:
-            from database.office_operation import get_all_offices, add_office, update_office_code, delete_office
-        except ImportError:
-            # Show error if office operations not available
-            error_frame = tk.Frame(parent, bg=self.colors['white'])
-            error_frame.pack(fill="x", padx=10, pady=5)
-            error_font_size = max(10, int(self.display_size / 80))
-            tk.Label(error_frame, text="⚠️ Office Management System Not Available", 
-                    font=("Arial", error_font_size, "bold"), fg=self.colors['accent'], 
-                    bg=self.colors['white']).pack(pady=20)
-            return
-        
-        # FIRST: Ensure the offices table exists
-        try:
-            from database.office_operation import create_office_table
-            create_office_table()  # This will create the table if it doesn't exist
-        except Exception as e:
-            print(f"❌ Error creating office table: {e}")
-        
-        # Responsive fonts
-        section_font_size = max(10, int(self.display_size / 80))
-        instruction_font_size = max(8, int(self.display_size / 100))
-        button_font_size = max(8, int(self.display_size / 110))
-        
-        # Office Management Frame
-        office_frame = tk.LabelFrame(parent, text="🏢 Office Management & Security Codes", 
-                                    font=("Arial", section_font_size, "bold"), 
-                                    bg=self.colors['white'], fg=self.colors['primary'],
-                                    relief="ridge", bd=2)
-        office_frame.pack(fill="x", padx=8, pady=4)
-        
-        # Instructions - UPDATED TO 4-DIGIT
-        instruction_label = tk.Label(office_frame, 
-                                    text="Manage visitor offices and their 4-digit security codes for timeout verification",
-                                    font=("Arial", instruction_font_size), fg=self.colors['secondary'],
-                                    bg=self.colors['white'])
-        instruction_label.pack(pady=(8, 0))
-        
-        # Office list with scrollbar - responsive height
-        list_frame = tk.Frame(office_frame, bg=self.colors['white'])
-        list_frame.pack(fill="both", expand=True, padx=8, pady=8)
-        
-        list_height = max(6, int(self.display_size / 120))
-        offices_list = tk.Listbox(list_frame, height=list_height, font=("Arial", instruction_font_size))
-        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=offices_list.yview)
-        offices_list.configure(yscrollcommand=scrollbar.set)
-        
-        offices_list.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        def refresh_office_list():
-            """Refresh the office list display"""
-            offices_list.delete(0, tk.END)
-            offices = get_all_offices()
-            for office in offices:
-                offices_list.insert(tk.END, f"{office['office_name']} (Code: {office['office_code']})")
-        
-        # Buttons frame
-        btn_frame = tk.Frame(office_frame, bg=self.colors['white'])
-        btn_frame.pack(fill="x", padx=8, pady=(0, 8))
-        
-        def add_new_office():
-            """Add a new office with auto-generated 4-digit code"""
-            office_name = simpledialog.askstring("Add Office", "Enter office name:")
-            if office_name and office_name.strip():
-                if add_office(office_name.strip()):
-                    # UPDATED MESSAGE TO 4-DIGIT
-                    messagebox.showinfo("Success", f"Office '{office_name}' added successfully!\nA unique 4-digit code has been generated.")
-                    refresh_office_list()
-                else:
-                    messagebox.showerror("Error", "Failed to add office!")
-        
-        def update_office_code_gui():
-            """Update the security code for selected office"""
-            selection = offices_list.curselection()
-            if not selection:
-                messagebox.showwarning("Warning", "Please select an office first!")
+            """Add office management to admin panel - RESPONSIVE with 4-digit codes and rotation"""
+            try:
+                from database.office_operation import get_all_offices, add_office, update_office_code, delete_office
+            except ImportError:
+                # Show error if office operations not available
+                error_frame = tk.Frame(parent, bg=self.colors['white'])
+                error_frame.pack(fill="x", padx=10, pady=5)
+                error_font_size = max(10, int(self.display_size / 80))
+                tk.Label(error_frame, text="⚠️ Office Management System Not Available", 
+                        font=("Arial", error_font_size, "bold"), fg=self.colors['accent'], 
+                        bg=self.colors['white']).pack(pady=20)
                 return
             
-            office_text = offices_list.get(selection[0])
-            office_name = office_text.split(" (Code:")[0]
-            current_code = office_text.split("Code: ")[1].replace(")", "")
+            # FIRST: Ensure the offices table exists
+            try:
+                from database.office_operation import create_office_table
+                create_office_table()  # This will create the table if it doesn't exist
+            except Exception as e:
+                print(f"❌ Error creating office table: {e}")
             
-            # UPDATED DIALOG TO 4-DIGIT
-            new_code = simpledialog.askstring("Update Security Code", 
-                                             f"Current code for '{office_name}': {current_code}\n\nEnter new 4-digit code:")
-            if new_code and new_code.strip():
-                if update_office_code(office_name, new_code.strip()):
-                    messagebox.showinfo("Success", f"Security code updated for '{office_name}'!")
-                    refresh_office_list()
-                else:
-                    # UPDATED ERROR MESSAGE TO 4-DIGIT
-                    messagebox.showerror("Error", "Failed to update code! Make sure it's exactly 4 digits and not already in use.")
-        
-        def delete_office_gui():
-            """Delete (deactivate) the selected office"""
-            selection = offices_list.curselection()
-            if not selection:
-                messagebox.showwarning("Warning", "Please select an office first!")
-                return
+            # Responsive fonts
+            section_font_size = max(10, int(self.display_size / 80))
+            instruction_font_size = max(8, int(self.display_size / 100))
+            button_font_size = max(8, int(self.display_size / 110))
             
-            office_text = offices_list.get(selection[0])
-            office_name = office_text.split(" (Code:")[0]
+            # Office Management Frame
+            office_frame = tk.LabelFrame(parent, text="🏢 Office Management & Security Codes", 
+                                        font=("Arial", section_font_size, "bold"), 
+                                        bg=self.colors['white'], fg=self.colors['primary'],
+                                        relief="ridge", bd=2)
+            office_frame.pack(fill="x", padx=8, pady=4)
             
-            if messagebox.askyesno("Confirm Delete", 
-                                  f"Delete office '{office_name}'?\n\nThis will:\n• Remove the office from visitor selection\n• Disable its security code\n• This action cannot be undone!"):
-                if delete_office(office_name):
-                    messagebox.showinfo("Success", f"Office '{office_name}' deleted!")
-                    refresh_office_list()
-                else:
-                    messagebox.showerror("Error", "Failed to delete office!")
-        
-        def show_office_codes():
-            """Show all office codes for reference"""
-            offices = get_all_offices()
-            if not offices:
-                messagebox.showinfo("No Offices", "No offices found in the system.")
-                return
+            # Instructions - UPDATED TO 4-DIGIT
+            instruction_label = tk.Label(office_frame, 
+                                        text="Manage visitor offices and their 4-digit security codes for timeout verification",
+                                        font=("Arial", instruction_font_size), fg=self.colors['secondary'],
+                                        bg=self.colors['white'])
+            instruction_label.pack(pady=(8, 0))
             
-            codes_text = "🏢 OFFICE SECURITY CODES:\n" + "="*40 + "\n"
-            for office in offices:
-                codes_text += f"• {office['office_name']}: {office['office_code']}\n"
+            # Office list with scrollbar - responsive height
+            list_frame = tk.Frame(office_frame, bg=self.colors['white'])
+            list_frame.pack(fill="both", expand=True, padx=8, pady=8)
             
-            # UPDATED MESSAGE TO 4-DIGIT
-            codes_text += "\n⚠️ These 4-digit codes are used for secure guest timeout verification."
+            list_height = max(6, int(self.display_size / 120))
+            offices_list = tk.Listbox(list_frame, height=list_height, font=("Arial", instruction_font_size))
+            scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=offices_list.yview)
+            offices_list.configure(yscrollcommand=scrollbar.set)
             
-            # Create a window to display codes - responsive
-            codes_window = tk.Toplevel(self.root)
-            codes_window.title("Office Security Codes")
+            offices_list.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
             
-            # Responsive sizing
-            codes_width = int(self.display_size * 0.4)
-            codes_height = int(self.display_size * 0.35)
-            codes_window.geometry(f"{codes_width}x{codes_height}")
-            codes_window.configure(bg=self.colors['white'])
+            def refresh_office_list():
+                """Refresh the office list display"""
+                offices_list.delete(0, tk.END)
+                offices = get_all_offices()
+                for office in offices:
+                    offices_list.insert(tk.END, f"{office['office_name']} (Code: {office['office_code']})")
             
-            # Center window
-            codes_window.update_idletasks()
-            x = (codes_window.winfo_screenwidth() // 2) - (codes_width // 2)
-            y = (codes_window.winfo_screenheight() // 2) - (codes_height // 2)
-            codes_window.geometry(f"{codes_width}x{codes_height}+{x}+{y}")
+            # Buttons frame
+            btn_frame = tk.Frame(office_frame, bg=self.colors['white'])
+            btn_frame.pack(fill="x", padx=8, pady=(0, 8))
             
-            # Text widget with scrollbar
-            text_frame = tk.Frame(codes_window, bg=self.colors['white'])
-            text_frame.pack(fill="both", expand=True, padx=15, pady=15)
+            def add_new_office():
+                """Add a new office with auto-generated 4-digit code"""
+                office_name = simpledialog.askstring("Add Office", "Enter office name:")
+                if office_name and office_name.strip():
+                    if add_office(office_name.strip()):
+                        # UPDATED MESSAGE TO 4-DIGIT
+                        messagebox.showinfo("Success", f"Office '{office_name}' added successfully!\nA unique 4-digit code has been generated.")
+                        refresh_office_list()
+                    else:
+                        messagebox.showerror("Error", "Failed to add office!")
             
-            text_font_size = max(9, int(self.display_size / 90))
-            text_widget = tk.Text(text_frame, font=("Courier", text_font_size), wrap="word")
-            text_scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
-            text_widget.configure(yscrollcommand=text_scrollbar.set)
+            def update_office_code_gui():
+                """Update the security code for selected office"""
+                selection = offices_list.curselection()
+                if not selection:
+                    messagebox.showwarning("Warning", "Please select an office first!")
+                    return
+                
+                office_text = offices_list.get(selection[0])
+                office_name = office_text.split(" (Code:")[0]
+                current_code = office_text.split("Code: ")[1].replace(")", "")
+                
+                # UPDATED DIALOG TO 4-DIGIT
+                new_code = simpledialog.askstring("Update Security Code", 
+                                                 f"Current code for '{office_name}': {current_code}\n\nEnter new 4-digit code:")
+                if new_code and new_code.strip():
+                    if update_office_code(office_name, new_code.strip()):
+                        messagebox.showinfo("Success", f"Security code updated for '{office_name}'!")
+                        refresh_office_list()
+                    else:
+                        # UPDATED ERROR MESSAGE TO 4-DIGIT
+                        messagebox.showerror("Error", "Failed to update code! Make sure it's exactly 4 digits and not already in use.")
             
-            text_widget.insert("1.0", codes_text)
-            text_widget.config(state="disabled")  # Make read-only
+            def delete_office_gui():
+                """Delete (deactivate) the selected office"""
+                selection = offices_list.curselection()
+                if not selection:
+                    messagebox.showwarning("Warning", "Please select an office first!")
+                    return
+                
+                office_text = offices_list.get(selection[0])
+                office_name = office_text.split(" (Code:")[0]
+                
+                if messagebox.askyesno("Confirm Delete", 
+                                      f"Delete office '{office_name}'?\n\nThis will:\n• Remove the office from visitor selection\n• Disable its security code\n• This action cannot be undone!"):
+                    if delete_office(office_name):
+                        messagebox.showinfo("Success", f"Office '{office_name}' deleted!")
+                        refresh_office_list()
+                    else:
+                        messagebox.showerror("Error", "Failed to delete office!")
             
-            text_widget.pack(side="left", fill="both", expand=True)
-            text_scrollbar.pack(side="right", fill="y")
+            def show_office_codes():
+                """Show all office codes for reference"""
+                offices = get_all_offices()
+                if not offices:
+                    messagebox.showinfo("No Offices", "No offices found in the system.")
+                    return
+                
+                codes_text = "🏢 OFFICE SECURITY CODES:\n" + "="*40 + "\n"
+                for office in offices:
+                    codes_text += f"• {office['office_name']}: {office['office_code']}\n"
+                
+                # UPDATED MESSAGE TO 4-DIGIT
+                codes_text += "\n⚠️ These 4-digit codes are used for secure guest timeout verification."
+                
+                # Create a window to display codes - responsive
+                codes_window = tk.Toplevel(self.root)
+                codes_window.title("Office Security Codes")
+                
+                # Responsive sizing
+                codes_width = int(self.display_size * 0.4)
+                codes_height = int(self.display_size * 0.35)
+                codes_window.geometry(f"{codes_width}x{codes_height}")
+                codes_window.configure(bg=self.colors['white'])
+                
+                # Center window
+                codes_window.update_idletasks()
+                x = (codes_window.winfo_screenwidth() // 2) - (codes_width // 2)
+                y = (codes_window.winfo_screenheight() // 2) - (codes_height // 2)
+                codes_window.geometry(f"{codes_width}x{codes_height}+{x}+{y}")
+                
+                # Text widget with scrollbar
+                text_frame = tk.Frame(codes_window, bg=self.colors['white'])
+                text_frame.pack(fill="both", expand=True, padx=15, pady=15)
+                
+                text_font_size = max(9, int(self.display_size / 90))
+                text_widget = tk.Text(text_frame, font=("Courier", text_font_size), wrap="word")
+                text_scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
+                text_widget.configure(yscrollcommand=text_scrollbar.set)
+                
+                text_widget.insert("1.0", codes_text)
+                text_widget.config(state="disabled")  # Make read-only
+                
+                text_widget.pack(side="left", fill="both", expand=True)
+                text_scrollbar.pack(side="right", fill="y")
+                
+                # Close button
+                close_font_size = max(8, int(self.display_size / 100))
+                tk.Button(codes_window, text="Close", command=codes_window.destroy,
+                         bg=self.colors['primary'], fg="white", font=("Arial", close_font_size, "bold"),
+                         cursor="hand2", pady=5).pack(pady=8)
             
-            # Close button
-            close_font_size = max(8, int(self.display_size / 100))
-            tk.Button(codes_window, text="Close", command=codes_window.destroy,
-                     bg=self.colors['primary'], fg="white", font=("Arial", close_font_size, "bold"),
-                     cursor="hand2", pady=5).pack(pady=8)
-        
-        # Responsive button padding
-        btn_padding = max(8, int(self.display_size / 100))
-        
-        # Buttons row 1
-        btn_row1 = tk.Frame(btn_frame, bg=self.colors['white'])
-        btn_row1.pack(fill="x", pady=(0, 4))
-        
-        tk.Button(btn_row1, text="➕ Add Office", command=add_new_office,
-                 bg=self.colors['success'], fg="white", font=("Arial", button_font_size, "bold"),
-                 cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
-        
-        tk.Button(btn_row1, text="🔄 Update Code", command=update_office_code_gui,
-                 bg=self.colors['warning'], fg="white", font=("Arial", button_font_size, "bold"),
-                 cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
-        
-        tk.Button(btn_row1, text="🗑️ Delete Office", command=delete_office_gui,
-                 bg=self.colors['accent'], fg="white", font=("Arial", button_font_size, "bold"),
-                 cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
-        
-        # Buttons row 2
-        btn_row2 = tk.Frame(btn_frame, bg=self.colors['white'])
-        btn_row2.pack(fill="x")
-        
-        tk.Button(btn_row2, text="🔍 View All Codes", command=show_office_codes,
-                 bg=self.colors['info'], fg="white", font=("Arial", button_font_size, "bold"),
-                 cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
-        
-        tk.Button(btn_row2, text="🔄 Refresh List", command=refresh_office_list,
-                 bg=self.colors['secondary'], fg="white", font=("Arial", button_font_size, "bold"),
-                 cursor="hand2", padx=btn_padding, pady=4).pack(side="right", padx=3)
-        
-        # Load initial data
-        refresh_office_list()
-    
+            # Responsive button padding
+            btn_padding = max(8, int(self.display_size / 100))
+            
+            # Buttons row 1
+            btn_row1 = tk.Frame(btn_frame, bg=self.colors['white'])
+            btn_row1.pack(fill="x", pady=(0, 4))
+            
+            tk.Button(btn_row1, text="➕ Add Office", command=add_new_office,
+                     bg=self.colors['success'], fg="white", font=("Arial", button_font_size, "bold"),
+                     cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
+            
+            tk.Button(btn_row1, text="🔄 Update Code", command=update_office_code_gui,
+                     bg=self.colors['warning'], fg="white", font=("Arial", button_font_size, "bold"),
+                     cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
+            
+            tk.Button(btn_row1, text="🗑️ Delete Office", command=delete_office_gui,
+                     bg=self.colors['accent'], fg="white", font=("Arial", button_font_size, "bold"),
+                     cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
+            
+            # Buttons row 2
+            btn_row2 = tk.Frame(btn_frame, bg=self.colors['white'])
+            btn_row2.pack(fill="x", pady=(0, 8))
+            
+            tk.Button(btn_row2, text="🔍 View All Codes", command=show_office_codes,
+                     bg=self.colors['info'], fg="white", font=("Arial", button_font_size, "bold"),
+                     cursor="hand2", padx=btn_padding, pady=4).pack(side="left", padx=3)
+            
+            tk.Button(btn_row2, text="🔄 Refresh List", command=refresh_office_list,
+                     bg=self.colors['secondary'], fg="white", font=("Arial", button_font_size, "bold"),
+                     cursor="hand2", padx=btn_padding, pady=4).pack(side="right", padx=3)
+            
+            # ROTATION MANAGEMENT SECTION (NEW)
+            tk.Label(office_frame, text="", bg=self.colors['white']).pack(pady=5)  # Spacer
+            
+            rotation_label = tk.Label(office_frame, text="🔄 Code Rotation (System Maintenance)", 
+                                     font=("Arial", section_font_size, "bold"), 
+                                     bg=self.colors['white'], fg=self.colors['primary'])
+            rotation_label.pack(pady=(10, 5))
+            
+            rotation_instruction = tk.Label(office_frame, 
+                                           text="Rotate all office codes at once - codes automatically sync to Firebase",
+                                           font=("Arial", instruction_font_size), fg=self.colors['secondary'],
+                                           bg=self.colors['white'])
+            rotation_instruction.pack(pady=(0, 10))
+            
+            # Rotation buttons frame
+            rotation_btn_frame = tk.Frame(office_frame, bg=self.colors['white'])
+            rotation_btn_frame.pack(fill="x", padx=8, pady=(0, 8))
+            
+            def weekly_rotation():
+                """Weekly code rotation"""
+                if messagebox.askyesno("Weekly Code Rotation", 
+                                      "Rotate ALL office codes?\n\n" +
+                                      "This will:\n" +
+                                      "• Generate new 4-digit codes for all offices\n" +
+                                      "• Sync codes to Firebase automatically\n" +
+                                      "• Old codes will become invalid\n\n" +
+                                      "Continue?"):
+                    try:
+                        from database.office_operation import rotate_all_office_codes_weekly
+                        count = rotate_all_office_codes_weekly()
+                        messagebox.showinfo("Weekly Rotation Complete", 
+                                           f"Successfully rotated codes for {count} offices!\n" +
+                                           "All codes have been synced to Firebase.")
+                        refresh_office_list()
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Weekly rotation failed: {str(e)}")
+            
+            def daily_rotation():
+                """Daily code rotation"""
+                if messagebox.askyesno("Daily Code Rotation", 
+                                      "Rotate ALL office codes?\n\n" +
+                                      "This will:\n" +
+                                      "• Generate new 4-digit codes for all offices\n" +
+                                      "• Sync codes to Firebase automatically\n" +
+                                      "• Old codes will become invalid\n\n" +
+                                      "Continue?"):
+                    try:
+                        from database.office_operation import rotate_all_office_codes_daily
+                        count = rotate_all_office_codes_daily()
+                        messagebox.showinfo("Daily Rotation Complete", 
+                                           f"Successfully rotated codes for {count} offices!\n" +
+                                           "All codes have been synced to Firebase.")
+                        refresh_office_list()
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Daily rotation failed: {str(e)}")
+            
+            def sync_firebase():
+                """Sync all offices to Firebase"""
+                if messagebox.askyesno("Sync to Firebase", 
+                                      "Sync all current office codes to Firebase?\n\n" +
+                                      "This will upload all current codes to the online database."):
+                    try:
+                        from database.office_operation import sync_all_offices_to_firebase
+                        if sync_all_offices_to_firebase():
+                            messagebox.showinfo("Sync Complete", "All office codes synced to Firebase!")
+                        else:
+                            messagebox.showerror("Sync Failed", "Failed to sync codes to Firebase!")
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Firebase sync error: {str(e)}")
+            
+            # Rotation buttons
+            tk.Button(rotation_btn_frame, text="📅 Weekly Rotation", font=("Arial", button_font_size),
+                     bg="#3498DB", fg="white", cursor="hand2", width=18,
+                     command=weekly_rotation).pack(side="left", padx=(0, 5))
+            
+            tk.Button(rotation_btn_frame, text="🗓️ Daily Rotation", font=("Arial", button_font_size),
+                     bg="#E67E22", fg="white", cursor="hand2", width=18,
+                     command=daily_rotation).pack(side="left", padx=5)
+            
+            tk.Button(rotation_btn_frame, text="🔥 Sync Firebase", font=("Arial", button_font_size),
+                     bg="#27AE60", fg="white", cursor="hand2", width=18,
+                     command=sync_firebase).pack(side="right", padx=(5, 0))
+            
+            # Load initial data
+            refresh_office_list()
+            
     # Helper functions
     def run_function(self, function_name):
         """Run admin function and show result"""

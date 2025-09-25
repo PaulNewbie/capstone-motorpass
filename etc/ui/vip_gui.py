@@ -30,9 +30,13 @@ def handle_vip_access(parent_root):
         # Create the fingerprint GUI (will keep main window visible as background)
         admin_gui = AdminFingerprintGUI(parent_root)
         
+        # Store guard info for later use
+        guard_info = {'name': None, 'slot': None, 'fingerprint_id': None}
+        
         def run_auth():
             # This runs the same authentication logic as Admin button
             from etc.services.hardware.fingerprint import finger, adafruit_fingerprint
+            from etc.utils.json_database import load_admin_database, load_fingerprint_database
             import time
             
             attempts = 0
@@ -58,7 +62,7 @@ def handle_vip_access(parent_root):
                 
                 if not finger_detected:
                     if attempts < max_attempts:
-                        admin_gui.root.after(0, lambda: admin_gui.update_status("⏰ Timeout! Try again...", "#e67e22"))
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("⏰ Timeout! Try again...", "#e74c3c"))
                         time.sleep(2)
                         continue
                     else:
@@ -66,8 +70,6 @@ def handle_vip_access(parent_root):
                         return
                 
                 # Process fingerprint
-                admin_gui.root.after(0, lambda: admin_gui.update_status("🔄 Processing...", "#f39c12"))
-                
                 try:
                     if finger.image_2_tz(1) != adafruit_fingerprint.OK:
                         if attempts < max_attempts:
@@ -77,35 +79,11 @@ def handle_vip_access(parent_root):
                         else:
                             admin_gui.root.after(0, admin_gui.show_failed)
                             return
-                except:
-                    if attempts < max_attempts:
-                        admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Sensor error! Try again...", "#e74c3c"))
-                        time.sleep(2)
-                        continue
-                    else:
-                        admin_gui.root.after(0, admin_gui.show_failed)
-                        return
-                
-                # Search for fingerprint
-                admin_gui.root.after(0, lambda: admin_gui.update_status("🔍 Searching...", "#9b59b6"))
-                
-                try:
+                    
+                    # Search for fingerprint match
                     if finger.finger_search() != adafruit_fingerprint.OK:
                         if attempts < max_attempts:
                             admin_gui.root.after(0, lambda: admin_gui.update_status("❌ No match found! Try again...", "#e74c3c"))
-                            time.sleep(2)
-                            continue
-                        else:
-                            admin_gui.root.after(0, admin_gui.show_failed)
-                            return
-                    
-                    # Check if matched fingerprint is admin (slot 1)
-                    if finger.finger_id == 1:
-                        admin_gui.root.after(0, admin_gui.show_success)
-                        return
-                    else:
-                        if attempts < max_attempts:
-                            admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Not admin fingerprint! Try again...", "#e74c3c"))
                             time.sleep(2)
                             continue
                         else:
@@ -120,6 +98,82 @@ def handle_vip_access(parent_root):
                     else:
                         admin_gui.root.after(0, admin_gui.show_failed)
                         return
+                
+                matched_slot = str(finger.finger_id)
+                
+                # Capture guard information
+                if matched_slot == "1":
+                    # Slot 1 = Super Admin
+                    try:
+                        admin_db = load_admin_database()
+                        user_name = admin_db.get("1", {}).get("name", "Super Admin")
+                    except:
+                        user_name = "Super Admin"
+                    
+                    guard_info['name'] = user_name
+                    guard_info['slot'] = matched_slot
+                    guard_info['fingerprint_id'] = matched_slot
+                    print(f"✅ Super Admin authenticated: {user_name} (Slot 1)")
+                    
+                elif matched_slot == "2":
+                    # Slot 2 = Guard
+                    try:
+                        fingerprint_db = load_fingerprint_database()
+                        user_name = fingerprint_db.get("2", {}).get("name", "Guard User")
+                    except:
+                        user_name = "Guard User"
+                    
+                    guard_info['name'] = user_name
+                    guard_info['slot'] = matched_slot
+                    guard_info['fingerprint_id'] = matched_slot
+                    print(f"✅ Guard authenticated: {user_name} (Slot 2)")
+                    
+                else:
+                    # All other slots = Check if they exist and are staff
+                    try:
+                        fingerprint_db = load_fingerprint_database()
+                        
+                        if matched_slot not in fingerprint_db:
+                            if attempts < max_attempts:
+                                admin_gui.root.after(0, lambda: admin_gui.update_status("❌ User not enrolled! Try again...", "#e74c3c"))
+                                time.sleep(2)
+                                continue
+                            else:
+                                admin_gui.root.after(0, admin_gui.show_failed)
+                                return
+                        
+                        finger_info = fingerprint_db[matched_slot]
+                        user_type = finger_info.get('user_type')
+                        user_name = finger_info.get('name', 'Unknown')
+                        
+                        # Only STAFF can access admin panel (not students)
+                        if user_type != 'STAFF':
+                            if attempts < max_attempts:
+                                admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Only staff can access admin! Try again...", "#e74c3c"))
+                                time.sleep(2)
+                                continue
+                            else:
+                                admin_gui.root.after(0, admin_gui.show_failed)
+                                return
+                        
+                        guard_info['name'] = user_name
+                        guard_info['slot'] = matched_slot
+                        guard_info['fingerprint_id'] = matched_slot
+                        print(f"✅ Staff Admin authenticated: {user_name} (Slot {matched_slot})")
+                        
+                    except Exception as e:
+                        print(f"❌ Database error: {e}")
+                        if attempts < max_attempts:
+                            admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Database error! Try again...", "#e74c3c"))
+                            time.sleep(2)
+                            continue
+                        else:
+                            admin_gui.root.after(0, admin_gui.show_failed)
+                            return
+                
+                print(f"🎯 Confidence: {finger.confidence}")
+                admin_gui.root.after(0, admin_gui.show_success)
+                return
             
             # All attempts failed
             admin_gui.root.after(0, admin_gui.show_failed)
@@ -158,7 +212,7 @@ def handle_vip_access(parent_root):
     # Create VIP window with main window staying visible as background
     vip_window = tk.Toplevel(parent_root)
     vip_window.title("VIP Access Panel")
-    vip_window.geometry("500x600")
+    vip_window.geometry("500x650")  # Increased height for multiple choice
     vip_window.configure(bg="white")
     vip_window.resizable(False, False)
     
@@ -173,8 +227,8 @@ def handle_vip_access(parent_root):
     screen_width = vip_window.winfo_screenwidth()
     screen_height = vip_window.winfo_screenheight()
     x = (screen_width // 2) - (500 // 2)
-    y = (screen_height // 2) - (600 // 2)
-    vip_window.geometry(f"500x600+{x}+{y}")
+    y = (screen_height // 2) - (650 // 2)
+    vip_window.geometry(f"500x650+{x}+{y}")
     
     # Handle VIP window close event to ensure main window stays visible
     def on_vip_window_close():
@@ -231,39 +285,38 @@ def handle_vip_access(parent_root):
         status_label.pack(pady=(0, 20))
         print("🔍 DEBUG: Status label created")
         
-        # Purpose selection frame (hidden initially)
+        # Purpose selection frame (hidden initially) - CHANGED TO MULTIPLE CHOICE
         purpose_frame = tk.Frame(form_frame, bg="white")
-        purpose_var = tk.StringVar()
-        purpose_buttons = []
+        purpose_vars = {}  # Dictionary to store multiple choice variables
+        purpose_checkboxes = []
         
-        tk.Label(purpose_frame, text="Select Purpose:", 
+        tk.Label(purpose_frame, text="Select Purpose(s):", 
                 font=("Arial", 11, "bold"), bg="white", fg="#34495E").pack(anchor="w", pady=(0,10))
         
-        # Create a sub-frame for the button grid to avoid geometry manager conflict
-        buttons_grid_frame = tk.Frame(purpose_frame, bg="white")
-        buttons_grid_frame.pack(fill="x")
+        # Create a sub-frame for the checkbox grid
+        checkboxes_grid_frame = tk.Frame(purpose_frame, bg="white")
+        checkboxes_grid_frame.pack(fill="x")
         
         purposes = ["Meeting", "Delivery", "Maintenance", "Inspection", "Other"]
         for i, purpose in enumerate(purposes):
-            btn = tk.Button(buttons_grid_frame, text=purpose, font=("Arial", 9),
-                           bg="#f0f0f0", fg="black", bd=1, relief='solid',
-                           width=12, cursor="hand2")
-            btn.grid(row=i//3, column=i%3, padx=3, pady=3, sticky="ew")
-            purpose_buttons.append(btn)
+            purpose_vars[purpose] = tk.BooleanVar()
             
-            def select_purpose(p=purpose, b=btn):
-                purpose_var.set(p)
-                for button in purpose_buttons:
-                    button.config(bg="#f0f0f0", fg="black")
-                b.config(bg="#27AE60", fg="white")
-            
-            btn.config(command=select_purpose)
+            checkbox = tk.Checkbutton(checkboxes_grid_frame, 
+                                    text=purpose, 
+                                    font=("Arial", 10),
+                                    variable=purpose_vars[purpose],
+                                    bg="white", 
+                                    fg="black",
+                                    selectcolor="#27AE60",
+                                    cursor="hand2")
+            checkbox.grid(row=i//2, column=i%2, padx=10, pady=3, sticky="w")
+            purpose_checkboxes.append(checkbox)
         
-        # Configure grid weights for the buttons_grid_frame
-        for i in range(3):
-            buttons_grid_frame.grid_columnconfigure(i, weight=1)
+        # Configure grid weights for the checkboxes_grid_frame
+        for i in range(2):
+            checkboxes_grid_frame.grid_columnconfigure(i, weight=1)
         
-        print("🔍 DEBUG: Purpose buttons created")
+        print("🔍 DEBUG: Purpose checkboxes created")
         
         def check_plate_status():
             plate_number = plate_entry.get().strip().upper()
@@ -283,12 +336,11 @@ def handle_vip_access(parent_root):
             action_result = determine_vip_action(plate_number)
             
             if action_result['action'] == 'TIME_IN':
-                status_label.config(text="TIME IN - Select purpose below", fg="#27AE60")
+                status_label.config(text="TIME IN - Select purpose(s) below", fg="#27AE60")
                 purpose_frame.pack(fill="x", pady=10)
-                purpose_var.set("")  # Reset purpose
-                # Reset button colors
-                for btn in purpose_buttons:
-                    btn.config(bg="#f0f0f0", fg="black")
+                # Reset all checkboxes
+                for purpose_var in purpose_vars.values():
+                    purpose_var.set(False)
             elif action_result['action'] == 'TIME_OUT':
                 vip_info = action_result['vip_info']
                 status_label.config(text=f"TIME OUT - {vip_info['purpose']}", fg="#E74C3C")
@@ -329,15 +381,23 @@ def handle_vip_access(parent_root):
             action_result = determine_vip_action(plate_number)
             
             if action_result['action'] == 'TIME_IN':
-                purpose = purpose_var.get()
-                if not purpose:
-                    messagebox.showerror("Error", "Please select purpose for TIME IN!")
+                # Get selected purposes (multiple choice)
+                selected_purposes = []
+                for purpose, var in purpose_vars.items():
+                    if var.get():
+                        selected_purposes.append(purpose)
+                
+                if not selected_purposes:
+                    messagebox.showerror("Error", "Please select at least one purpose for TIME IN!")
                     return
                 
-                # Process TIME IN
-                result = process_vip_time_in(plate_number, purpose)
+                # Join multiple purposes with comma
+                purpose_text = ", ".join(selected_purposes)
+                
+                # Process TIME IN with guard info
+                result = process_vip_time_in_with_guard(plate_number, purpose_text, guard_info)
                 if result['success']:
-                    messagebox.showinfo("Success", f"VIP TIME IN successful!\nPlate: {plate_number}\nPurpose: {purpose}")
+                    messagebox.showinfo("Success", f"VIP TIME IN successful!\nPlate: {plate_number}\nPurpose: {purpose_text}\nGuard: {guard_info['name']}")
                     # Ensure main window stays visible after success
                     if parent_root:
                         parent_root.deiconify()
@@ -348,11 +408,11 @@ def handle_vip_access(parent_root):
                     messagebox.showerror("Error", f"TIME IN failed: {result['message']}")
                     
             elif action_result['action'] == 'TIME_OUT':
-                # Process TIME OUT
-                result = process_vip_time_out(plate_number)
+                # Process TIME OUT with guard info
+                result = process_vip_time_out_with_guard(plate_number, guard_info)
                 if result['success']:
                     vip_info = action_result['vip_info']
-                    messagebox.showinfo("Success", f"VIP TIME OUT successful!\nPlate: {plate_number}\nPurpose: {vip_info['purpose']}")
+                    messagebox.showinfo("Success", f"VIP TIME OUT successful!\nPlate: {plate_number}\nPurpose: {vip_info['purpose']}\nGuard: {guard_info['name']}")
                     # Ensure main window stays visible after success
                     if parent_root:
                         parent_root.deiconify()
@@ -386,3 +446,28 @@ def handle_vip_access(parent_root):
         if parent_root:
             parent_root.deiconify()
             parent_root.lift()
+
+
+# New functions to handle guard info
+def process_vip_time_in_with_guard(plate_number, purpose, guard_info):
+    """Process VIP TIME IN with guard information"""
+    try:
+        # Import the updated controller function
+        from etc.controllers.vip import process_vip_time_in_with_guard as controller_func
+        return controller_func(plate_number, purpose, guard_info)
+    except ImportError:
+        # Fallback to original function if new one doesn't exist yet
+        from etc.controllers.vip import process_vip_time_in
+        return process_vip_time_in(plate_number, purpose)
+
+
+def process_vip_time_out_with_guard(plate_number, guard_info):
+    """Process VIP TIME OUT with guard information"""
+    try:
+        # Import the updated controller function
+        from etc.controllers.vip import process_vip_time_out_with_guard as controller_func
+        return controller_func(plate_number, guard_info)
+    except ImportError:
+        # Fallback to original function if new one doesn't exist yet
+        from etc.controllers.vip import process_vip_time_out
+        return process_vip_time_out(plate_number)
