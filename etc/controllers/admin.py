@@ -457,7 +457,7 @@ def admin_panel(main_window=None):
         return
     
     try:
-        from etc.ui.admin_gui import AdminPanelGUI
+        from ui.views.admin_views import AdminPanelView as AdminPanelGUI
         
         admin_functions = {
             'authenticate': lambda: True,

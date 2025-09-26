@@ -12,7 +12,7 @@ This module contains all GUI interfaces for the MotorPass system:
 from .main_window import MotorPassGUI
 from .student_gui import StudentVerificationGUI
 from .guest_gui import GuestVerificationGUI
-from .admin_gui import AdminPanelGUI
+from .views.admin_views import AdminPanelGUI
 
 __all__ = [
     'MotorPassGUI',

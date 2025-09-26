@@ -9,6 +9,8 @@ import os
 from PIL import Image, ImageTk
 import json
 
+from ui.ui_components import UIComponents
+
 class AdminPanelGUI:
     def __init__(self, admin_functions, skip_auth=False, user_role="super_admin"):
         self.root = tk.Tk()
