@@ -1,27 +1,23 @@
-# ui/views/admin_view.py - Fully Refactored AdminGUI
-# Clean separation: UI only, business logic extracted
+# ui/views/admin_views.py - CLEAN Views Only - NO Duplicated Functions
+# FIXED: Only calls existing functions from organized files, exact UI from legacy admin_gui.py
 
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import messagebox, simpledialog
 
-# Import our reusable components
+# Import our organized components - USE EXISTING FUNCTIONS ONLY
 from ui.components.ui_components import UIComponents
-from ui.components.window_helpers import WindowManager, ResponsiveCalculator, WindowIntegration
-from ui.business.auth_manager import AuthManager, AuthenticationScreen, create_auth_manager
-from ui.business.admin_operations import AdminOperationHandler, create_admin_handler
+from ui.components.window_helpers import WindowIntegration
+from ui.business.auth_manager import create_auth_manager, AuthenticationScreen
+from ui.business.admin_operations import create_admin_handler
 
 class AdminPanelView:
-    """Clean AdminGUI - Only UI logic, no business logic"""
+    """Clean AdminGUI - Exact UI from legacy admin_gui.py, no duplicated functions"""
     
     def __init__(self, admin_functions, skip_auth=False, user_role="super_admin"):
         self.admin_functions = admin_functions
         self.root = tk.Tk()
         
-        # ========================================
-        # COMPONENT SETUP - All in one place
-        # ========================================
-        
-        # Window management
+        # Use WindowIntegration for ALL setup - don't duplicate
         self.gui_setup = WindowIntegration.setup_common_gui_features(
             root=self.root,
             title="MotorPass - Admin Control Center",
@@ -29,40 +25,40 @@ class AdminPanelView:
             enable_refresh=True
         )
         
-        # Authentication management
+        # Use existing AuthManager - don't duplicate
         self.auth_manager = create_auth_manager()
         
-        # Business logic handler
+        # Use existing AdminOperationHandler - don't duplicate  
         self.operation_handler = create_admin_handler(
             admin_functions=admin_functions,
             message_handler=self.show_operation_result
         )
         
-        # UI references (extracted from gui_setup)
+        # Get references from gui_setup - don't duplicate
         self.screen_info = self.gui_setup['screen_info']
         self.time_manager = self.gui_setup['time_manager']
         self.font_sizes = self.gui_setup['font_sizes']
         self.padding_sizes = self.gui_setup['padding_sizes']
         
-        # Convenience properties
+        # Convenience properties from legacy
         self.screen_width = self.screen_info['screen_width']
         self.screen_height = self.screen_info['screen_height']
         self.display_size = self.screen_info['display_size']
         self.is_square_display = self.screen_info['is_square_display']
         
-        # UI variables
+        # UI variables from gui_setup
         self.time_string = self.time_manager['time_string']
         self.date_string = self.time_manager['date_string']
         self.status_text = self.gui_setup['status_manager']['status_var']
         
-        # Colors (unchanged)
+        # Colors from legacy admin_gui.py
         self.colors = {
             'primary': '#2C3E50', 'secondary': '#34495E', 'accent': '#E74C3C',
             'success': '#27AE60', 'warning': '#F39C12', 'info': '#3498DB',
             'light': '#ECF0F1', 'dark': '#1A252F', 'gold': '#F1C40F', 'white': '#FFFFFF'
         }
         
-        # Initialize based on authentication
+        # Initialize - exact same logic as legacy
         if skip_auth:
             self.auth_manager.authenticate_user(user_role)
             self.show_admin_panel()
@@ -70,111 +66,188 @@ class AdminPanelView:
             self.show_authentication_screen()
     
     # ========================================
-    # AUTHENTICATION METHODS - Using AuthManager
+    # AUTHENTICATION - Use existing AuthenticationScreen
     # ========================================
     
     def show_authentication_screen(self):
-        """Show authentication screen using AuthenticationScreen component"""
+        """Use existing AuthenticationScreen component"""
         self.auth_screen = AuthenticationScreen(
             parent_root=self.root,
             colors=self.colors,
             font_sizes=self.font_sizes,
-            on_success_callback=self.on_authentication_success
+            on_success_callback=self.on_authentication_success,
+            admin_functions=self.admin_functions
         )
         self.auth_screen.create_authentication_screen()
     
     def on_authentication_success(self, user_role):
-        """Handle successful authentication
-        
-        Args:
-            user_role: Authenticated user role
-        """
-        # Update auth manager
+        """Handle successful authentication"""
         self.auth_manager.authenticate_user(user_role)
-        
-        # Show admin panel
         self.show_admin_panel()
     
     # ========================================
-    # MAIN INTERFACE METHODS - Using UI Components
+    # MAIN INTERFACE - Use existing WindowIntegration functions
     # ========================================
     
     def show_admin_panel(self):
-        """Show the main admin panel interface"""
+        """Show admin panel - EXACT layout from legacy admin_gui.py"""
         # Clear window
         for widget in self.root.winfo_children():
             widget.destroy()
         
         # Main container
-        main_container = tk.Frame(self.root, bg=self.colors['white'])
-        main_container.pack(fill="both", expand=True,
-                           padx=self.padding_sizes['content_x'],
-                           pady=self.padding_sizes['content_y'])
+        main_container = tk.Frame(self.root, bg=self.colors['light'])
+        main_container.pack(fill="both", expand=True)
         
-        # Create interface based on display type
-        if self.screen_info['is_wide_display']:
-            self.create_wide_interface(main_container)
+        # Use existing header function - DON'T duplicate
+        WindowIntegration.create_enhanced_header(
+            main_container, self.colors, self.font_sizes,
+            self.time_string, self.date_string,
+            title_text="🔧 MotorPass Admin Panel"
+        )
+        
+        # Content area - exact same logic as legacy
+        content_container = tk.Frame(main_container, bg=self.colors['light'])
+        content_container.pack(fill="both", expand=True)
+        
+        if self.is_square_display:
+            # Square display layout - from legacy
+            self.create_stats_top_bar(content_container)
+            main_content = tk.Frame(content_container, bg=self.colors['white'])
+            main_content.pack(fill="both", expand=True, padx=15, pady=(0, 15))
         else:
-            self.create_standard_interface(main_container)
+            # Wide display layout - from legacy
+            self.create_stats_sidebar(content_container)
+            main_content = tk.Frame(content_container, bg=self.colors['white'])
+            main_content.pack(side="right", fill="both", expand=True, padx=(0, 15), pady=15)
+        
+        # Use existing menu cards function - DON'T duplicate
+        self.create_menu_cards(main_content)
+        
+        # Use existing footer function - DON'T duplicate
+        WindowIntegration.create_enhanced_footer(
+            main_container, self.colors, self.font_sizes,
+            user_role=self.auth_manager.get_role_display_name(),
+            on_logout=self.logout_and_exit
+        )
     
-    def create_standard_interface(self, parent):
-        """Create standard interface layout"""
-        # Header
-        self.create_header(parent)
-        
-        # Main content
-        content_frame = tk.Frame(parent, bg=self.colors['white'])
-        content_frame.pack(fill="both", expand=True, pady=self.padding_sizes['section_spacing'])
-        
-        # Menu cards
-        self.create_menu_cards(content_frame)
+    def logout_and_exit(self):
+        """Logout and exit"""
+        self.auth_manager.logout()
+        self.close()
     
-    def create_wide_interface(self, parent):
-        """Create wide display interface with sidebar"""
-        # Header
-        self.create_header(parent)
-        
-        # Main content with sidebar
-        content_frame = tk.Frame(parent, bg=self.colors['white'])
-        content_frame.pack(fill="both", expand=True, pady=self.padding_sizes['section_spacing'])
-        
-        # Sidebar for stats
-        self.create_stats_sidebar(content_frame)
-        
-        # Menu cards in remaining space
-        menu_frame = tk.Frame(content_frame, bg=self.colors['white'])
-        menu_frame.pack(side="right", fill="both", expand=True)
-        
-        self.create_menu_cards(menu_frame)
+    # ========================================
+    # STATS DISPLAY - Only UI layout logic, no business logic
+    # ========================================
     
-    def create_header(self, parent):
-        """Create header with role information"""
-        header = tk.Frame(parent, bg=self.colors['primary'])
-        header.pack(fill="x", pady=(0, self.padding_sizes['section_spacing']))
+    def create_stats_top_bar(self, parent):
+        """Create stats top bar - layout only"""
+        stats_height = max(60, int(self.screen_height * 0.1))
+        stats_frame = tk.Frame(parent, bg=self.colors['secondary'], height=stats_height)
+        stats_frame.pack(fill="x", padx=15, pady=15)
+        stats_frame.pack_propagate(False)
         
-        # Title with role info
-        role_name = self.auth_manager.get_role_display_name()
-        title_text = f"🔐 Admin Control Center ({role_name})"
+        stats_content = tk.Frame(stats_frame, bg=self.colors['secondary'])
+        stats_content.pack(expand=True, fill="both", pady=10)
         
-        tk.Label(header, text=title_text,
-                font=("Arial", self.font_sizes['title'], "bold"),
-                fg=self.colors['white'], bg=self.colors['primary']).pack(pady=10)
+        # Title
+        title_font_size = max(11, int(self.display_size / 75))
+        tk.Label(stats_content, text="📊 LIVE STATISTICS",
+                font=("Arial", title_font_size, "bold"), fg=self.colors['white'],
+                bg=self.colors['secondary']).pack()
         
-        # Time display
-        time_frame = tk.Frame(header, bg=self.colors['primary'])
-        time_frame.pack(pady=(0, 10))
+        # Stats items horizontally
+        self.create_stats_items_horizontal(stats_content)
+    
+    def create_stats_sidebar(self, parent):
+        """Create stats sidebar - layout only"""
+        sidebar_width = max(200, int(self.screen_width * 0.25))
+        stats_frame = tk.Frame(parent, bg=self.colors['secondary'], width=sidebar_width)
+        stats_frame.pack(side="left", fill="y", padx=15, pady=15)
+        stats_frame.pack_propagate(False)
         
-        tk.Label(time_frame, textvariable=self.time_string,
-                font=("Arial", self.font_sizes['time'], "bold"),
-                fg=self.colors['gold'], bg=self.colors['primary']).pack()
+        # Title
+        tk.Label(stats_frame, text="📊 SYSTEM STATUS",
+                font=("Arial", self.font_sizes['card_title'], "bold"),
+                fg=self.colors['light'], bg=self.colors['secondary']).pack(pady=15)
         
-        tk.Label(time_frame, textvariable=self.date_string,
-                font=("Arial", self.font_sizes['date']),
-                fg=self.colors['light'], bg=self.colors['primary']).pack()
+        # Stats items vertically
+        self.create_stats_items_vertical(stats_frame)
+    
+    def create_stats_items_horizontal(self, parent):
+        """Create horizontal stats display"""
+        stats_data = self.get_stats_data()
+        
+        stats_container = tk.Frame(parent, bg=self.colors['secondary'])
+        stats_container.pack(expand=True, pady=(5, 0))
+        
+        stat_font_size = max(8, int(self.display_size / 110))
+        stat_value_size = max(12, int(self.display_size / 70))
+        
+        for icon, label, value, color in stats_data:
+            stat_item = tk.Frame(stats_container, bg=self.colors['secondary'])
+            stat_item.pack(side="left", padx=12)
+            tk.Label(stat_item, text=f"{icon} {label}", font=("Arial", stat_font_size),
+                    fg=self.colors['light'], bg=self.colors['secondary']).pack()
+            tk.Label(stat_item, text=str(value), font=("Arial", stat_value_size, "bold"),
+                    fg=color, bg=self.colors['secondary']).pack()
+    
+    def create_stats_items_vertical(self, parent):
+        """Create vertical stats display"""
+        stats_data = self.get_stats_data()
+        
+        card_spacing = max(8, int(self.screen_height / 80))
+        
+        for icon, label, value, color in stats_data[:4]:  # Limit to 4 for sidebar
+            self.create_stat_card(parent, icon, label, value, color, card_spacing)
+    
+    def get_stats_data(self):
+        """Get stats data - simple data gathering"""
+        default_stats = [
+            ("👥", "Total Users", "N/A", self.colors['info']),
+            ("🔐", "Admin Status", "Active", self.colors['success']),
+            ("📊", "System", "Online", self.colors['success'])
+        ]
+        
+        # Try to get real stats if available
+        if self.admin_functions and 'get_stats' in self.admin_functions:
+            try:
+                real_stats = self.admin_functions['get_stats']()
+                if real_stats:
+                    total = real_stats.get('total_students', 0) + real_stats.get('total_staff', 0)
+                    default_stats[0] = ("👥", "Total Users", str(total), self.colors['info'])
+            except:
+                pass
+        
+        return default_stats
+    
+    def create_stat_card(self, parent, icon, label, value, color, spacing=10):
+        """Create a single stat card"""
+        card = tk.Frame(parent, bg=self.colors['dark'])
+        card.pack(fill="x", padx=12, pady=spacing)
+        
+        content_padding = max(8, int(self.display_size / 100))
+        content = tk.Frame(card, bg=self.colors['dark'])
+        content.pack(fill="x", padx=content_padding, pady=content_padding)
+        
+        stat_label_size = max(9, int(self.display_size / 90))
+        stat_value_size = max(16, int(self.display_size / 50))
+        
+        tk.Label(content, text=f"{icon} {label}",
+                font=("Arial", stat_label_size), fg=self.colors['light'],
+                bg=self.colors['dark']).pack(anchor="w")
+        
+        tk.Label(content, text=str(value),
+                font=("Arial", stat_value_size, "bold"), fg=color,
+                bg=self.colors['dark']).pack(anchor="w", pady=(3, 0))
+    
+    # ========================================
+    # MENU CARDS - Use existing UIComponents
+    # ========================================
     
     def create_menu_cards(self, parent):
-        """Create menu cards using UIComponents with access control"""
-        # Define all possible cards - FIX: Use the correct method calls
+        """Use existing UIComponents.create_menu_card_layout - DON'T duplicate"""
+        # Define cards data
         all_cards_data = [
             ("👤", "Enroll New User", "Register student/staff with fingerprint",
              self.enroll_user, self.colors['success'], "enroll"),
@@ -192,13 +265,13 @@ class AdminPanelView:
              self.show_office_management, self.colors['gold'], "system_maintenance")
         ]
         
-        # Filter cards based on user access
+        # Filter by access
         accessible_cards = [
             card for card in all_cards_data
-            if self.auth_manager.has_access(card[5])  # card[5] is function_name
+            if self.auth_manager.has_access(card[5])
         ]
         
-        # Use UIComponents for layout
+        # Use existing UIComponents function - DON'T duplicate
         UIComponents.create_menu_card_layout(
             parent=parent,
             cards_data=accessible_cards,
@@ -211,325 +284,95 @@ class AdminPanelView:
         )
     
     # ========================================
-    # BUSINESS OPERATION METHODS - Add the missing methods!
+    # BUSINESS OPERATIONS - Call existing handlers ONLY
     # ========================================
     
     def enroll_user(self):
-        """Enroll new user - call admin operation"""
+        """Call existing operation handler"""
         if not self.auth_manager.require_access("enroll"):
             return
         
-        result = messagebox.askquestion("Enroll User", 
-                                   "This will start the enrollment process.\n\n" +
-                                   "You will need:\n" +
-                                   "• Student/Staff ID\n" +
-                                   "• User's fingerprint\n\n" +
-                                   "Continue?")
+        result = messagebox.askquestion("Enroll User",
+                                       "This will start the enrollment process.\n\n" +
+                                       "You will need:\n" +
+                                       "• Student/Staff ID\n" +
+                                       "• User's fingerprint\n\n" +
+                                       "Continue?")
         if result == 'yes':
             self.operation_handler.execute_operation('enroll_user')
     
     def view_users(self):
-        """View users - call existing method"""
-        self.show_users_window()
+        """Use existing UIComponents function"""
+        if not self.auth_manager.require_access("view_users"):
+            return
+        UIComponents.create_users_display_window(
+            self.root, self.colors, self.font_sizes, self.admin_functions
+        )
     
     def delete_user(self):
-        """Delete user - call admin operation"""
+        """Call existing operation handler"""
         if not self.auth_manager.require_access("delete_fingerprint"):
             return
         
-        result = messagebox.askquestion("Delete User", 
-                                   "This will delete a user's fingerprint.\n\n" +
-                                   "The deletion process will guide you through selecting the user.\n\n" +
-                                   "Continue?")
+        result = messagebox.askquestion("Delete User",
+                                       "This will delete a user's fingerprint.\n\n" +
+                                       "The deletion process will guide you through selecting the user.\n\n" +
+                                       "Continue?")
         if result == 'yes':
             self.operation_handler.execute_operation('delete_user')
     
     def sync_database(self):
-        """Sync database - call admin operation"""
+        """Call existing operation handler"""
         if not self.auth_manager.require_access("sync"):
             return
         
-        result = messagebox.askquestion("Sync Database", 
-                                   "This will synchronize with Google Sheets database.\n\n" +
-                                   "This may take a few moments.\n\n" +
-                                   "Continue?")
+        result = messagebox.askquestion("Sync Database",
+                                       "This will synchronize with Google Sheets database.\n\n" +
+                                       "This may take a few moments.\n\n" +
+                                       "Continue?")
         if result == 'yes':
             self.operation_handler.execute_operation('sync_database')
     
     def view_time_records(self):
-        """View time records - call existing method"""
-        self.show_time_records_window()
+        """Use existing UIComponents function"""
+        if not self.auth_manager.require_access("get_time_records"):
+            return
+        UIComponents.create_time_records_window(
+            self.root, self.colors, self.font_sizes, self.admin_functions
+        )
     
     def clear_time_records(self):
-        """Clear time records - call admin operation"""
+        """Call existing operation handler"""
         if not self.auth_manager.require_access("clear_records"):
             return
         
-        result = messagebox.askquestion("Clear Time Records", 
-                                   "This will DELETE ALL time records permanently.\n\n" +
-                                   "⚠️ This action cannot be undone!\n\n" +
-                                   "Continue?")
+        result = messagebox.askquestion("Clear Time Records",
+                                       "This will DELETE ALL time records permanently.\n\n" +
+                                       "⚠️ This action cannot be undone!\n\n" +
+                                       "Continue?")
         if result == 'yes':
-            self.operation_handler.execute_operation('clear_time_records')
-    
-    def create_stats_sidebar(self, parent):
-        """Create statistics sidebar using UIComponents"""
-        # Get stats from operation handler
-        stats = self.operation_handler.get_stats_sync()
-        
-        # Responsive sidebar width
-        sidebar_width = max(200, int(self.screen_width * 0.20))
-        sidebar = tk.Frame(parent, bg=self.colors['secondary'], width=sidebar_width)
-        sidebar.pack(side="left", fill="y", padx=(15, 15), pady=15)
-        sidebar.pack_propagate(False)
-        
-        # Title
-        tk.Label(sidebar, text="📊 LIVE STATISTICS",
-                font=("Arial", self.font_sizes['title']), fg=self.colors['white'],
-                bg=self.colors['secondary']).pack(pady=15)
-        
-        # Stat cards using UIComponents
-        card_spacing = max(8, int(self.screen_height / 80))
-        
-        UIComponents.create_stat_card(sidebar, "👥", "Total Users",
-                                    stats.get('total_students', 0) + stats.get('total_staff', 0),
-                                    self.colors['info'], self.colors, self.display_size, card_spacing)
-        
-        UIComponents.create_stat_card(sidebar, "🎓", "Students",
-                                    stats.get('total_students', 0),
-                                    self.colors['success'], self.colors, self.display_size, card_spacing)
-        
-        UIComponents.create_stat_card(sidebar, "👔", "Staff",
-                                    stats.get('total_staff', 0),
-                                    self.colors['warning'], self.colors, self.display_size, card_spacing)
-        
-        UIComponents.create_stat_card(sidebar, "🚗", "Currently Inside",
-                                    stats.get('users_currently_in', 0),
-                                    self.colors['accent'], self.colors, self.display_size, card_spacing)
-    
-    # ========================================
-    # BUSINESS OPERATION METHODS - Using AdminOperationHandler
-    # ========================================
-    
-    def execute_admin_operation(self, operation_name):
-        """Execute admin operation using operation handler
-        
-        Args:
-            operation_name: Name of operation to execute
-        """
-        # Check access first
-        if not self.auth_manager.require_access(operation_name.replace('_', '')):
-            return
-        
-        # Check if operation is already running
-        if self.operation_handler.is_busy(operation_name):
-            messagebox.showwarning("Operation in Progress",
-                                 f"The {operation_name.replace('_', ' ')} operation is already running.")
-            return
-        
-        # Execute the operation
-        self.operation_handler.execute_operation(operation_name)
-    
-    def show_operation_result(self, title, message, is_error=False):
-        """Show operation result to user
-        
-        Args:
-            title: Result title
-            message: Result message
-            is_error: Whether this is an error
-        """
-        if is_error:
-            messagebox.showerror(title, message)
-        else:
-            messagebox.showinfo(title, message)
-    
-    # ========================================
-    # WINDOW DISPLAY METHODS - Using Window Management
-    # ========================================
-    
-    def show_users_window(self):
-        """Show users window using WindowManager"""
-        if not self.auth_manager.require_access("view_users"):
-            return
-        
-        # Get users data
-        users_data = self.operation_handler.get_users_sync()
-        
-        # Create modal window
-        window_sizes = ResponsiveCalculator.get_window_sizes(self.screen_info, 'large_modal')
-        users_window = WindowManager.setup_modal_window(
-            parent=self.root,
-            title="Enrolled Users",
-            width=window_sizes['width'],
-            height=window_sizes['height'],
-            bg_color=self.colors['white']
-        )
-        
-        # Header
-        header = tk.Frame(users_window, bg=self.colors['primary'],
-                         height=max(60, int(window_sizes['height'] * 0.12)))
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        
-        tk.Label(header, text="👥 ENROLLED USERS",
-                font=("Arial", self.font_sizes['title']), fg=self.colors['white'],
-                bg=self.colors['primary']).pack(expand=True)
-        
-        # Content using UIComponents
-        if not users_data:
-            # Empty state
-            empty_frame = tk.Frame(users_window, bg=self.colors['white'])
-            empty_frame.pack(fill="both", expand=True, padx=20, pady=20)
-            
-            tk.Label(empty_frame, text="📭", font=("Arial", 32),
-                    fg=self.colors['light'], bg=self.colors['white']).pack(pady=(50, 20))
-            tk.Label(empty_frame, text="No users enrolled",
-                    font=("Arial", self.font_sizes['subtitle']), fg=self.colors['secondary'],
-                    bg=self.colors['white']).pack()
-        else:
-            # User list using scrollable container
-            scrollable_frame = UIComponents.create_scrollable_container(users_window, self.colors)
-            
-            # Create user cards
-            for slot_id, info in sorted(users_data.items(), key=lambda x: x[0]):
-                if slot_id == "1":  # Skip admin
-                    continue
-                UIComponents.create_modern_user_card(scrollable_frame, slot_id, info,
-                                                   self.colors, self.display_size)
-        
-        # Close button
-        close_btn = tk.Button(users_window, text="CLOSE",
-                             font=("Arial", self.font_sizes['button'], "bold"),
-                             bg=self.colors['accent'], fg=self.colors['white'],
-                             relief='flat', bd=0, cursor="hand2",
-                             padx=30, pady=10, command=users_window.destroy)
-        close_btn.pack(pady=15)
-    
-    def show_time_records_window(self):
-        """Show time records window"""
-        if not self.auth_manager.require_access("get_time_records"):
-            return
-        
-        # Get time records (this will be async in the background)
-        self.operation_handler.execute_operation("get_time_records",
-                                               callback=self._display_time_records)
-    
-    def _display_time_records(self, result):
-        """Display time records in a window
-        
-        Args:
-            result: Result from get_time_records operation
-        """
-        if not result['success']:
-            return  # Error already shown by operation handler
-        
-        records = result['data']
-        
-        # Create modal window
-        window_sizes = ResponsiveCalculator.get_window_sizes(self.screen_info, 'large_modal')
-        records_window = WindowManager.setup_modal_window(
-            parent=self.root,
-            title="Time Records",
-            width=window_sizes['width'],
-            height=window_sizes['height'],
-            bg_color=self.colors['white']
-        )
-        
-        # Header
-        header = tk.Frame(records_window, bg=self.colors['primary'],
-                         height=max(60, int(window_sizes['height'] * 0.12)))
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        
-        tk.Label(header, text="🕒 TIME RECORDS",
-                font=("Arial", self.font_sizes['title']), fg=self.colors['white'],
-                bg=self.colors['primary']).pack(expand=True)
-        
-        if not records:
-            # Empty state
-            empty_frame = tk.Frame(records_window, bg=self.colors['white'])
-            empty_frame.pack(fill="both", expand=True, padx=20, pady=20)
-            
-            tk.Label(empty_frame, text="📭", font=("Arial", 32),
-                    fg=self.colors['light'], bg=self.colors['white']).pack(pady=(50, 20))
-            tk.Label(empty_frame, text="No time records found",
-                    font=("Arial", self.font_sizes['subtitle']), fg=self.colors['secondary'],
-                    bg=self.colors['white']).pack()
-        else:
-            # Records table
-            self._create_records_table(records_window, records)
-        
-        # Close button
-        close_btn = tk.Button(records_window, text="CLOSE",
-                             font=("Arial", self.font_sizes['button'], "bold"),
-                             bg=self.colors['accent'], fg=self.colors['white'],
-                             relief='flat', bd=0, cursor="hand2",
-                             padx=30, pady=10, command=records_window.destroy)
-        close_btn.pack(pady=15)
-    
-    def _create_records_table(self, parent, records):
-        """Create records table using ttk.Treeview
-        
-        Args:
-            parent: Parent widget
-            records: List of time records
-        """
-        table_frame = tk.Frame(parent, bg=self.colors['white'])
-        table_frame.pack(fill="both", expand=True, padx=15, pady=15)
-        
-        # Configure style
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure('Treeview',
-                       background=self.colors['white'],
-                       fieldbackground=self.colors['white'],
-                       borderwidth=0,
-                       font=('Arial', max(8, int(self.display_size / 100))))
-        
-        # Create treeview
-        columns = ('Date', 'Time', 'ID', 'Name', 'Type', 'Status')
-        tree = ttk.Treeview(table_frame, columns=columns, show='tree headings',
-                           height=max(15, int(self.screen_height / 30)))
-        
-        # Configure columns
-        tree.column('#0', width=0, stretch=False)
-        for col in columns:
-            tree.column(col, width=max(80, int(self.screen_width / 12)))
-            tree.heading(col, text=col)
-        
-        # Add records
-        for i, record in enumerate(records):
-            values = (
-                record.get('date', 'N/A'),
-                record.get('time', 'N/A'),
-                record.get('student_id', 'N/A'),
-                record.get('student_name', 'N/A'),
-                record.get('user_type', 'STUDENT'),
-                record.get('status', 'N/A')
-            )
-            tree.insert('', 'end', values=values)
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        
-        tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+            self.operation_handler.execute_operation('clear_records')
     
     def show_office_management(self):
-        """Show office management window using UIComponents"""
+        """Create office management window using existing UIComponents"""
         if not self.auth_manager.require_access("system_maintenance"):
             return
         
-        # Create modal window using WindowManager
-        window_sizes = ResponsiveCalculator.get_window_sizes(self.screen_info, 'large_modal')
-        office_window = WindowManager.setup_modal_window(
-            parent=self.root,
-            title="Office Management",
-            width=window_sizes['width'],
-            height=window_sizes['height'],
-            bg_color=self.colors['white']
-        )
+        # Create window
+        office_window = tk.Toplevel(self.root)
+        office_window.title("🏢 Office Management")
+        office_window.configure(bg=self.colors['white'])
+        
+        # Window sizing - from legacy
+        window_sizes = {
+            'width': max(800, int(self.screen_width * 0.7)),
+            'height': max(600, int(self.screen_height * 0.8))
+        }
+        
+        # Center window
+        x = (self.screen_width - window_sizes['width']) // 2
+        y = (self.screen_height - window_sizes['height']) // 2
+        office_window.geometry(f"{window_sizes['width']}x{window_sizes['height']}+{x}+{y}")
         
         # Header
         header = tk.Frame(office_window, bg=self.colors['primary'],
@@ -541,13 +384,14 @@ class AdminPanelView:
                 font=("Arial", self.font_sizes['subtitle']), fg=self.colors['light'],
                 bg=self.colors['primary']).pack(expand=True)
         
-        # Use UIComponents for scrollable content
+        # Use existing UIComponents for scrollable content - DON'T duplicate
         scrollable_frame = UIComponents.create_scrollable_container(office_window, self.colors)
         
-        # Use UIComponents for complete office management section
+        # Office section
         office_section = tk.Frame(scrollable_frame, bg=self.colors['white'])
         office_section.pack(fill="x", padx=15, pady=15)
         
+        # Use existing UIComponents for office management - DON'T duplicate
         UIComponents.create_office_management_section(
             parent=office_section,
             colors=self.colors,
@@ -562,13 +406,21 @@ class AdminPanelView:
                  bg=self.colors['dark'], fg="white", font=("Arial", self.font_sizes['button'], "bold"),
                  cursor="hand2", padx=20, pady=8).pack()
     
+    def show_operation_result(self, title, message, is_error=False):
+        """Show operation result"""
+        if is_error:
+            messagebox.showerror(title, message)
+        else:
+            messagebox.showinfo(title, message)
+    
     # ========================================
-    # MAIN CONTROL METHODS - No Changes Needed
+    # CONTROL METHODS
     # ========================================
     
     def run(self):
         """Run the GUI"""
         try:
+            self.root.bind('<Escape>', lambda e: self.close())
             self.root.mainloop()
         except Exception as e:
             print(f"Error running GUI: {e}")
@@ -584,10 +436,9 @@ class AdminPanelView:
             pass
 
 
-# Backward compatibility alias
+# Backward compatibility
 AdminPanelGUI = AdminPanelView
 
-# For compatibility with existing imports
 class AdminPanelGUI(AdminPanelView):
-    """Backward compatibility class - same as AdminPanelView"""
+    """Backward compatibility class"""
     pass
