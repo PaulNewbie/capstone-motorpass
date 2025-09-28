@@ -41,14 +41,21 @@ def student_verification():
     print("🖥️ Opening GUI interface...")
     
     # Import GUI here to avoid circular imports
-    from etc.ui.student_gui import StudentVerificationGUI
+    from etc.ui.views.student_view import StudentVerificationView
     
     # Create and run GUI
-    gui = StudentVerificationGUI(run_verification_with_gui)
+    gui = StudentVerificationView(run_verification_with_gui)
     gui.run()
 
-def run_verification_with_gui(status_callback):
+def run_verification_with_gui(callback=None):
     """Run verification steps with GUI status updates"""
+    
+    # Handle the callback parameter
+    if callback is None:
+        def callback(data):
+            print(f"Status update: {data}")
+    
+    status_callback = callback
     
     # Initialize systems
     init_buzzer()

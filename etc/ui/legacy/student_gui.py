@@ -11,7 +11,7 @@ import sys
 import queue
 
 
-from refresh import add_refresh_to_window
+from ..refresh import add_refresh_to_window
 
 
 class StudentVerificationGUI:
