@@ -1,4 +1,4 @@
-# ui/business/student_operations.py - ONLY business logic, no UI duplication
+# ui/business/student_operations.py - FIXED: Handle correct status keys from controller
 
 import threading
 from datetime import datetime
@@ -29,10 +29,25 @@ class StudentVerificationManager:
         verification_thread.start()
     
     def update_status(self, status_dict, gui_instance):
-        """Update GUI status - delegates UI updates to GUI"""
+        """Update GUI status - FIXED: Handle correct status keys from controller"""
         try:
-            # Handle fingerprint result with user info
-            if 'fingerprint_result' in status_dict:
+            # FIXED: Handle helmet status with correct key names
+            if 'helmet_status' in status_dict:
+                status = status_dict['helmet_status']
+                gui_instance.helmet_status.set(status)
+            elif 'helmet_detected' in status_dict:
+                # Legacy support for old key name
+                if status_dict['helmet_detected']:
+                    gui_instance.helmet_status.set("VERIFIED")
+                else:
+                    gui_instance.helmet_status.set("FAILED")
+            
+            # FIXED: Handle fingerprint status with correct key names
+            if 'fingerprint_status' in status_dict:
+                status = status_dict['fingerprint_status']
+                gui_instance.fingerprint_status.set(status)
+            elif 'fingerprint_result' in status_dict:
+                # Legacy support for old key name
                 result = status_dict['fingerprint_result']
                 if result.get('verified', False):
                     gui_instance.fingerprint_status.set("VERIFIED")
@@ -42,19 +57,22 @@ class StudentVerificationManager:
                 else:
                     gui_instance.fingerprint_status.set("FAILED")
             
-            # Handle helmet status
-            if 'helmet_detected' in status_dict:
-                if status_dict['helmet_detected']:
-                    gui_instance.helmet_status.set("VERIFIED")
-                else:
-                    gui_instance.helmet_status.set("FAILED")
-            
-            # Handle license status
-            if 'license_verified' in status_dict:
+            # FIXED: Handle license status with correct key names
+            if 'license_status' in status_dict:
+                status = status_dict['license_status']
+                gui_instance.license_status.set(status)
+            elif 'license_verified' in status_dict:
+                # Legacy support for old key name
                 if status_dict['license_verified']:
                     gui_instance.license_status.set("VERIFIED")
                 else:
                     gui_instance.license_status.set("FAILED")
+            
+            # Handle user info display
+            if 'user_info' in status_dict:
+                user_info = status_dict['user_info']
+                if user_info:
+                    gui_instance.show_user_info(user_info)
             
             # Handle current step updates
             if 'current_step' in status_dict:
@@ -89,55 +107,27 @@ class StudentStatusTracker:
     def update_helmet(self, verified):
         """Update helmet status"""
         self.helmet_verified = verified
-        return {'helmet_detected': verified}
-    
+        
     def update_fingerprint(self, verified, user_info=None):
         """Update fingerprint status"""
         self.fingerprint_verified = verified
-        self.user_info = user_info
-        return {
-            'fingerprint_result': {
-                'verified': verified,
-                'user_info': user_info or {}
-            }
-        }
-    
+        if user_info:
+            self.user_info = user_info
+            
     def update_license(self, verified):
         """Update license status"""
         self.license_verified = verified
-        return {'license_verified': verified}
-    
+        
     def is_complete(self):
-        """Check if verification is complete"""
-        return all([self.helmet_verified, self.fingerprint_verified, self.license_verified])
-    
-    def get_completion_percentage(self):
-        """Get completion percentage"""
-        completed = sum([self.helmet_verified, self.fingerprint_verified, self.license_verified])
-        return int((completed / 3) * 100)
-
-
-class StudentTimeManager:
-    """Manage verification timing"""
-    
-    def __init__(self):
-        self.start_time = None
-        self.timeout_duration = 300  # 5 minutes
+        """Check if all verifications are complete"""
+        return self.helmet_verified and self.fingerprint_verified and self.license_verified
         
-    def start_timer(self):
-        """Start verification timer"""
-        self.start_time = datetime.now()
-        
-    def get_elapsed_seconds(self):
-        """Get elapsed time in seconds"""
-        if not self.start_time:
-            return 0
-        return (datetime.now() - self.start_time).total_seconds()
-    
-    def is_timeout(self):
-        """Check if timeout exceeded"""
-        return self.get_elapsed_seconds() > self.timeout_duration
-    
-    def get_remaining_seconds(self):
-        """Get remaining seconds before timeout"""
-        return max(0, self.timeout_duration - self.get_elapsed_seconds())
+    def get_summary(self):
+        """Get verification summary"""
+        return {
+            'helmet': self.helmet_verified,
+            'fingerprint': self.fingerprint_verified,
+            'license': self.license_verified,
+            'user_info': self.user_info,
+            'complete': self.is_complete()
+        }

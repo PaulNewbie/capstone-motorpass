@@ -1,55 +1,34 @@
-# ui/views/student_view.py - ACTUALLY using reusable components, no duplication
+# ui/views/student_view.py - PROPERLY ORGANIZED: Uses reusable components
 
 import tkinter as tk
-import threading
 from datetime import datetime
+import threading
+from etc.ui.components.verification_components import VerificationUIComponents
+from etc.ui.business.student_operations import StudentVerificationManager
 
-# Import EXISTING reusable components - no duplication
-from ui.components.window_helpers import WindowManager, ResponsiveCalculator
-from ui.components.verification_components import VerificationUIComponents
-from ui.business.student_operations import StudentVerificationManager
-
-# Import refresh safely
 try:
-    import sys
-    import os
-    parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-    from refresh import add_refresh_to_window
+    from etc.utils.window_utils import add_refresh_to_window
+    refresh_available = True
 except ImportError:
-    def add_refresh_to_window(window):
-        try:
-            window.bind('<F5>', lambda e: print("F5 refresh requested"))
-        except:
-            pass
-
+    refresh_available = False
 
 class StudentVerificationView:
-    """Student verification GUI using ACTUAL reusable components"""
+    """Student Verification GUI using properly organized reusable components"""
     
     def __init__(self, verification_function):
-        self.root = tk.Tk()
         self.verification_function = verification_function
         self.verification_complete = False
-        
-        # Use EXISTING WindowManager - no duplication
-        self.screen_info = WindowManager.setup_fullscreen_window(
-            root=self.root,
-            title="MotorPass - Student/Staff Verification",
-            bg_color='#8B4513'
-        )
-        
-        # Use EXISTING ResponsiveCalculator - no duplication
-        self.font_sizes = ResponsiveCalculator.calculate_font_sizes(self.screen_info['display_size'])
-        self.padding_sizes = ResponsiveCalculator.calculate_padding_sizes(
-            self.screen_info['screen_width'], self.screen_info['screen_height']
-        )
-        
-        # Initialize business logic manager - actual separation
         self.verification_manager = StudentVerificationManager()
         
-        if add_refresh_to_window:
+        # Screen info for responsive design
+        self.screen_info = self.get_screen_info()
+        self.calculate_responsive_padding()
+        
+        # Create window
+        self.create_window()
+        
+        # Add refresh functionality if available
+        if refresh_available:
             add_refresh_to_window(self.root)
             
         self.create_variables()
@@ -58,6 +37,44 @@ class StudentVerificationView:
         # Bind keys
         self.root.bind('<Escape>', lambda e: self.close())
         self.root.bind('<F11>', self.toggle_fullscreen)
+        
+    def get_screen_info(self):
+        """Get screen information for responsive design"""
+        root = tk.Tk()
+        root.withdraw()
+        
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        is_square_display = abs(screen_width - screen_height) < 200
+        
+        root.destroy()
+        
+        return {
+            'screen_width': screen_width,
+            'screen_height': screen_height,
+            'is_square_display': is_square_display
+        }
+    
+    def calculate_responsive_padding(self):
+        """Calculate responsive padding sizes"""
+        screen_width = self.screen_info['screen_width']
+        screen_height = self.screen_info['screen_height']
+        
+        self.padding_sizes = {
+            'content_x': max(15, int(screen_width * 0.015)),
+            'content_y': max(10, int(screen_height * 0.012)),
+            'section_spacing': max(15, int(min(screen_width, screen_height) * 0.02))
+        }
+    
+    def create_window(self):
+        """Create main window"""
+        self.root = tk.Tk()
+        self.root.title("MotorPass - Student/Staff Verification")
+        self.root.configure(bg='#8B4513')
+        
+        # Fullscreen
+        self.root.attributes('-fullscreen', True)
+        self.root.geometry(f"{self.screen_info['screen_width']}x{self.screen_info['screen_height']}+0+0")
         
     def toggle_fullscreen(self, event=None):
         """Toggle fullscreen"""
@@ -93,7 +110,7 @@ class StudentVerificationView:
             pass
     
     def create_interface(self):
-        """Create interface using ACTUAL reusable components"""
+        """Create interface using reusable components"""
         # Main container
         main_container = tk.Frame(self.root, bg='#8B4513')
         main_container.pack(fill="both", expand=True)
@@ -126,14 +143,8 @@ class StudentVerificationView:
         # Left panel - USE reusable status panel component
         self.create_status_panel(panels_container)
         
-        # Right panel - USE reusable camera component
-        right_frame = tk.Frame(panels_container, bg='#8B4513')
-        right_frame.pack(side="right", fill="both", expand=True)
-        
-        VerificationUIComponents.create_camera_feed_panel(
-            parent=right_frame,
-            screen_info=self.screen_info
-        )
+        # Right panel - USE reusable student info component
+        self.create_student_info_panel(panels_container)
         
         # Footer - USE reusable component
         VerificationUIComponents.create_verification_footer(
@@ -143,7 +154,7 @@ class StudentVerificationView:
         )
         
     def create_status_panel(self, parent):
-        """Create status panel using reusable components"""
+        """Create simple status panel - no user info cluttering"""
         left_frame = tk.Frame(parent, bg='#8B4513')
         left_frame.pack(side="left", fill="both", expand=True, 
                        padx=(0, self.padding_sizes['section_spacing']))
@@ -155,45 +166,42 @@ class StudentVerificationView:
             'license': ("🪪 LICENSE CHECK:", self.license_status)
         }
         
-        # USE reusable status panel component
-        status_panel = VerificationUIComponents.create_status_panel(
+        # USE reusable status panel component - clean and simple
+        VerificationUIComponents.create_status_panel(
             parent=left_frame,
             status_vars=status_vars,
             screen_info=self.screen_info,
             title="VERIFICATION STATUS"
         )
+
+    def create_student_info_panel(self, parent):
+        """Create clean student info panel using reusable component"""
+        right_frame = tk.Frame(parent, bg='#8B4513')
+        right_frame.pack(side="right", fill="both", expand=True)
         
-        # Add user info panel using reusable component
-        user_info_components = VerificationUIComponents.create_user_info_panel(
-            parent=status_panel['container'],
-            screen_info=self.screen_info
+        # USE clean student info component
+        student_info_components = VerificationUIComponents.create_student_info_panel(
+            parent=right_frame,
+            screen_info=self.screen_info,
+            current_step_var=self.current_step
         )
         
         # Store references for later use
-        self.user_info_panel = user_info_components['panel']
-        self.user_details_frame = user_info_components['details_frame']
+        self.student_welcome_label = student_info_components['welcome_label']
+        self.student_details_frame = student_info_components['details_frame']
+        self.student_welcome_card = student_info_components['welcome_card']
 
     def show_user_info(self, user_info):
-        """Display user info using reusable component"""
-        # Define fields specific to student verification
-        student_fields = [
-            ("Name:", 'name'),
-            ("Student ID:", 'student_id'),
-            ("Course:", 'course'),
-            ("User Type:", 'user_type')
-        ]
-        
-        # USE reusable component
-        VerificationUIComponents.update_user_info_display(
-            user_details_frame=self.user_details_frame,
+        """Display user info - clean and focused"""
+        # Update the right panel with clean student information
+        VerificationUIComponents.update_student_info_display(
+            details_frame=self.student_details_frame,
+            welcome_label=self.student_welcome_label,
+            step_label=None,  # Not needed anymore
             user_info=user_info,
             screen_info=self.screen_info,
-            info_fields=student_fields
+            welcome_card=self.student_welcome_card
         )
-        
-        # Show the panel
-        panel_spacing_y = max(15, int(self.screen_info['screen_height'] * 0.02))
-        self.user_info_panel.pack(fill="x", pady=(panel_spacing_y, 0))
 
     def update_status(self, status_dict):
         """Update status using business logic manager"""
