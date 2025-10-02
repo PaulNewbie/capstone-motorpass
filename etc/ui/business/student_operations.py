@@ -81,6 +81,8 @@ class StudentVerificationManager:
             # Handle final result
             if 'final_result' in status_dict:
                 result = status_dict['final_result']
+                
+                # Display in terminal
                 print(f"\n{'='*60}")
                 print(f"🏁 VERIFICATION COMPLETE")
                 print(f"✅ Result: {'PASSED' if result.get('verified', False) else 'FAILED'}")
@@ -88,9 +90,9 @@ class StudentVerificationManager:
                     print(f"❌ Reason: {result.get('reason', 'Unknown')}")
                 print(f"{'='*60}")
                 
-                # Auto-close after showing result
-                gui_instance.root.after(3000, gui_instance.close)
-                
+                # CHANGED: Use the custom show_final_result instead of show_results_gui
+                gui_instance.show_final_result(result)
+                            
         except Exception as e:
             print(f"Error updating status: {e}")
 

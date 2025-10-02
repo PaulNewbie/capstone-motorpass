@@ -12,6 +12,7 @@ import queue
 # Import our reusable components - NO DUPLICATED CODE
 from ui.components.window_helpers import WindowManager, ResponsiveCalculator
 from ui.components.ui_components import UIComponents
+from etc.ui.components.verification_components import VerificationUIComponents
 from refresh import add_refresh_to_window
 
 
@@ -339,18 +340,17 @@ class GuestVerificationView:
                 self.guest_info.set(str(guest_data))
     
     def show_verification_result(self, result):
-        """Show final verification result - USE existing result pattern"""
-        if result.get('verified', False):
-            self.current_step.set("✅ VISITOR VERIFICATION SUCCESSFUL!")
-            guest_name = result.get('name', 'Visitor')
-            office = result.get('office', 'Unknown Office')
-            self.guest_info.set(f"Welcome, {guest_name}!\nVisiting: {office}")
-        else:
-            self.current_step.set(f"❌ VERIFICATION FAILED: {result.get('reason', 'Unknown error')}")
-            self.guest_info.set("❌ Access Denied")
+        """Show final verification result - USE REUSABLE COMPONENT"""
+        self.verification_complete = True
         
-        # Auto close after delay
-        self.root.after(5000, self.close_verification)  # Longer delay for guest
+        # USE the same reusable component with guest customization
+        VerificationUIComponents.show_final_result_overlay(
+            root=self.root,
+            result=result,
+            screen_info=self.screen_info,
+            close_callback=self.close_verification,
+            user_type="guest"
+        ) # Longer delay for guest
     
     def close_verification(self):
         """Close verification window"""

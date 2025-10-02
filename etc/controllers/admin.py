@@ -203,7 +203,6 @@ def admin_reset_all():
 #SYNC buttom
 def admin_sync_database():
     """Sync database from Google Sheets - saves directly to motorpass.db"""
-    # ... (keep existing sync function as is)
     try:
         import gspread
         from oauth2client.service_account import ServiceAccountCredentials
@@ -244,14 +243,14 @@ def admin_sync_database():
         
         for row in rows:
             try:
-                # Extract data from row
-                full_name = row.get('Full Name', '').strip()
+                # Extract data from row - CONVERT TO STRING FIRST, THEN STRIP
+                full_name = str(row.get('Full Name', '')).strip()
                 license_number = str(row.get('License Number', '')).strip()
-                expiration_date = row.get('License Expiration Date', '').strip()
-                plate_number = row.get('Plate Number of the Motorcycle', '').strip()
-                course = row.get('Course', '').strip()
-                student_id = row.get('Student No.', '').strip()
-                staff_role = row.get('Staff Role', '').strip()
+                expiration_date = str(row.get('License Expiration Date', '')).strip()
+                plate_number = str(row.get('Plate Number of the Motorcycle', '')).strip()
+                course = str(row.get('Course', '')).strip()
+                student_id = str(row.get('Student No.', '')).strip()  # FIX: Added str()
+                staff_role = str(row.get('Staff Role', '')).strip()
                 staff_no = str(row.get('ID No.', '')).strip()
                 
                 # Skip if no name
@@ -324,20 +323,9 @@ def admin_sync_database():
         print(f"   🎓 Total Students: {total_students}")
         print(f"   👔 Total Staff: {total_staff}")
             
-    except gspread.exceptions.SpreadsheetNotFound:
-        print(f"❌ Spreadsheet '{sheet_name}' not found")
-        print("💡 Please check:")
-        print("   1. The exact name of your Google Sheet")
-        print("   2. That the service account has access to the sheet")
-        print("   3. The sheet is shared with the service account email")
-        
-    except FileNotFoundError:
-        print("❌ credentials.json not found!")
-        print("💡 Please ensure json_folder/spreadsheet_credentials.json exists")
-        
     except Exception as e:
-        print(f"❌ Sync failed: {e}")
-        print("💡 Check your credentials.json and internet connection")
+        print(f"❌ Fatal error during sync: {e}")
+        raise
 
 # VIEW records Button
 def admin_view_time_records():

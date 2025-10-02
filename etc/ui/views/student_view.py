@@ -202,6 +202,19 @@ class StudentVerificationView:
             screen_info=self.screen_info,
             welcome_card=self.student_welcome_card
         )
+        
+    def show_final_result(self, result):
+        """Show final verification result - USE REUSABLE COMPONENT"""
+        self.verification_complete = True
+        
+        # USE the reusable component
+        VerificationUIComponents.show_final_result_overlay(
+            root=self.root,
+            result=result,
+            screen_info=self.screen_info,
+            close_callback=self.close,
+            user_type="student"
+        )
 
     def update_status(self, status_dict):
         """Update status using business logic manager"""

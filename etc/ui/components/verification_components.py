@@ -434,3 +434,148 @@ class VerificationUIComponents:
                 
         except Exception as e:
             print(f"Error showing student info: {e}")
+            
+    @staticmethod
+    def show_final_result_overlay(root, result, screen_info, close_callback=None, user_type="student"):
+        """
+        Reusable final result overlay - works for ANY verification type
+        
+        Args:
+            root: Parent Tk window
+            result: Verification result dict
+            screen_info: Screen dimensions
+            close_callback: Optional callback to execute before closing
+            user_type: "student" or "guest" for customized messages
+        
+        Returns:
+            None (auto-closes after delay)
+        """
+        try:
+            # Result box with responsive sizing - INCREASED SIZE
+            screen_width = screen_info['screen_width']
+            screen_height = screen_info['screen_height']
+            
+            # CHANGED: Make box bigger to fit longer names
+            result_width = max(450, int(screen_width * 0.45))   # Increased from 0.4
+            result_height = max(350, int(screen_height * 0.4))  # Increased from 0.35
+            
+            result_box = tk.Frame(root, bg='#FFD700', relief='raised', bd=4,
+                                 width=result_width, height=result_height)
+            result_box.place(relx=0.5, rely=0.5, anchor='center')
+            result_box.pack_propagate(False)
+            
+            # Content with responsive spacing
+            content_padding_x = max(30, int(result_width * 0.07))  # Reduced padding
+            content_padding_y = max(20, int(result_height * 0.06))
+            
+            content = tk.Frame(result_box, bg='#FFD700')
+            content.pack(padx=content_padding_x, pady=content_padding_y, fill="both", expand=True)
+            
+            if result.get('verified', False):
+                # SUCCESS LAYOUT
+                VerificationUIComponents._create_success_content(
+                    content, result, result_width, result_height, 
+                    screen_width, screen_height, user_type
+                )
+                close_delay = 4000
+            else:
+                # FAILURE LAYOUT
+                VerificationUIComponents._create_failure_content(
+                    content, result, result_width, result_height,
+                    screen_width, screen_height
+                )
+                close_delay = 5000
+            
+            # Auto close with callback
+            def auto_close():
+                try:
+                    result_box.destroy()
+                    if close_callback:
+                        close_callback()
+                except:
+                    pass
+            
+            root.after(close_delay, auto_close)
+            
+        except Exception as e:
+            print(f"Error showing final result: {e}")
+            if close_callback:
+                close_callback()
+
+    @staticmethod
+    def _create_success_content(content, result, result_width, result_height, 
+                               screen_width, screen_height, user_type):
+        """Create success message content"""
+        # Responsive font sizes
+        icon_font_size = max(30, int(min(screen_width, screen_height) / 22))  # Slightly smaller
+        title_font_size = max(16, int(screen_width / 50))  # Slightly smaller
+        welcome_font_size = max(13, int(screen_width / 65))
+        action_font_size = max(11, int(screen_width / 80))
+        
+        # Success icon
+        icon_label = tk.Label(content, text="✅", font=("Arial", icon_font_size), bg='#FFD700')
+        icon_label.pack(pady=(0, max(8, int(result_height * 0.025))))
+        
+        # Title based on user type - CHANGED: Shorter text
+        if user_type == "guest":
+            title_text = "VISITOR VERIFIED"  # Shortened
+        else:
+            title_text = "VERIFIED SUCCESSFULLY"  # Shortened
+        
+        title = tk.Label(content, text=title_text, 
+                       font=("Arial", title_font_size, "bold"), fg="#2E7D32", bg='#FFD700')
+        title.pack(pady=(0, max(8, int(result_height * 0.025))))
+        
+        # Format name
+        name = result.get('name', 'User')
+        if ',' in name:
+            parts = name.split(',')
+            if len(parts) >= 2:
+                name = f"{parts[1].strip()} {parts[0].strip()}"
+        
+        # CHANGED: Add wraplength to welcome message to handle long names
+        wrap_length = max(350, int(result_width * 0.85))
+        welcome = tk.Label(content, text=f"Welcome, {name}!", 
+                         font=("Arial", welcome_font_size, "bold"), fg="#1B5E20", bg='#FFD700',
+                         wraplength=wrap_length, justify='center')  # ADDED wraplength
+        welcome.pack(pady=(0, max(6, int(result_height * 0.02))))
+        
+        # Action info - customized per user type
+        if user_type == "guest":
+            office = result.get('office', 'Unknown Office')
+            action_text = f"Visiting: {office}"
+            if result.get('time_action'):
+                action_text += f"\nTime {result.get('time_action', 'IN')}: {result.get('timestamp', 'N/A')}"
+        else:
+            time_action = result.get('time_action', 'IN')
+            action_text = f"Time {time_action}: {result.get('timestamp', 'N/A')}"
+        
+        action_label = tk.Label(content, text=action_text, 
+                               font=("Arial", action_font_size), fg="#424242", bg='#FFD700',
+                               justify='center', wraplength=wrap_length)  # ADDED wraplength
+        action_label.pack(pady=(0, max(4, int(result_height * 0.015))))
+
+    @staticmethod
+    def _create_failure_content(content, result, result_width, result_height,
+                               screen_width, screen_height):
+        """Create failure message content"""
+        # Responsive font sizes
+        icon_font_size = max(30, int(min(screen_width, screen_height) / 22))
+        title_font_size = max(16, int(screen_width / 50))
+        reason_font_size = max(12, int(screen_width / 70))
+        
+        # Failure icon
+        icon_label = tk.Label(content, text="❌", font=("Arial", icon_font_size), bg='#FFD700')
+        icon_label.pack(pady=(0, max(8, int(result_height * 0.025))))
+        
+        # Title - CHANGED: Shorter text
+        title = tk.Label(content, text="VERIFICATION FAILED", 
+                       font=("Arial", title_font_size, "bold"), fg="#C62828", bg='#FFD700')
+        title.pack(pady=(0, max(8, int(result_height * 0.025))))
+        
+        # Reason with word wrap - CHANGED: Increased wrap length
+        reason_wrap_length = max(350, int(result_width * 0.85))
+        reason = tk.Label(content, text=result.get('reason', 'Unknown error'), 
+                        font=("Arial", reason_font_size), fg="#424242", bg='#FFD700', 
+                        wraplength=reason_wrap_length, justify='center')  # ADDED justify center
+        reason.pack(pady=(0, max(6, int(result_height * 0.02))))
