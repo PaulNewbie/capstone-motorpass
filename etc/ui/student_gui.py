@@ -10,9 +10,7 @@ from typing import Dict
 import sys
 import queue
 
-
 from ..refresh import add_refresh_to_window
-
 
 class StudentVerificationGUI:
     def __init__(self, verification_function):
