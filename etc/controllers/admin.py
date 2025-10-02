@@ -48,21 +48,151 @@ def enroll_admin_fingerprint():
 
 # ENROLL Button
 def admin_enroll():
-    """Enroll new user (student or staff)"""
+    """Enroll new user (student or staff) with GUI"""
+    from etc.ui.enrollment_fingerprint_gui import EnrollmentFingerprintGUI
+    import threading
+    
     if finger.read_templates() != adafruit_fingerprint.OK:
         print("❌ Failed to read templates")
         return
     
     print(f"📊 Current enrollments: {finger.template_count}")
 
+    # Get user info first
+    user_info = get_user_id_gui()
+    if not user_info:
+        print("❌ No user selected.")
+        return
+    
     # Get slot (skip admin slots 1-2)
     location = find_next_available_slot()
     if location in [1, 2]:
         print("❌ Slots #1-2 reserved for admins. Use slot 3+")
         return
     
-    success = enroll_finger_with_user_info(location)  
-    print(f"{'✅ Success!' if success else '❌ Failed.'}")
+    print(f"👤 Enrolling: {user_info['full_name']} ({user_info['user_type']})")
+    print(f"🔢 Using slot: {location}")
+    
+    # Create enrollment GUI
+    enroll_gui = EnrollmentFingerprintGUI(user_name=user_info['full_name'])
+    
+    def run_enrollment():
+        """Run the fingerprint enrollment process"""
+        try:
+            # ===== SCAN 1 =====
+            enroll_gui.root.after(0, lambda: enroll_gui.update_scan_number(1))
+            enroll_gui.root.after(0, lambda: enroll_gui.update_status("👆 Place finger on sensor...", "#3498db"))
+            
+            # Wait for finger
+            while finger.get_image() != adafruit_fingerprint.OK:
+                time.sleep(0.1)
+            
+            enroll_gui.root.after(0, lambda: enroll_gui.update_status("🔄 Processing first scan...", "#f39c12"))
+            
+            if finger.image_2_tz(1) != adafruit_fingerprint.OK:
+                print("❌ Failed to process first scan")
+                enroll_gui.root.after(0, enroll_gui.show_failed)
+                return
+            
+            print("✅ First scan complete")
+            
+            # Remove finger
+            enroll_gui.root.after(0, enroll_gui.show_remove_finger)
+            time.sleep(2)
+            
+            # Wait for finger removal
+            while finger.get_image() == adafruit_fingerprint.OK:
+                time.sleep(0.1)
+            
+            # ===== SCAN 2 =====
+            enroll_gui.root.after(0, lambda: enroll_gui.update_scan_number(2))
+            enroll_gui.root.after(0, lambda: enroll_gui.update_status("👆 Place SAME finger again...", "#3498db"))
+            
+            # Wait for finger again
+            while finger.get_image() != adafruit_fingerprint.OK:
+                time.sleep(0.1)
+            
+            enroll_gui.root.after(0, lambda: enroll_gui.update_status("🔄 Processing second scan...", "#f39c12"))
+            
+            if finger.image_2_tz(2) != adafruit_fingerprint.OK:
+                print("❌ Failed to process second scan")
+                enroll_gui.root.after(0, enroll_gui.show_failed)
+                return
+            
+            print("✅ Second scan complete")
+            
+            # Create template
+            enroll_gui.root.after(0, lambda: enroll_gui.update_status("🔄 Creating fingerprint template...", "#9b59b6"))
+            
+            if finger.create_model() != adafruit_fingerprint.OK:
+                print("❌ Failed to create template")
+                enroll_gui.root.after(0, enroll_gui.show_failed)
+                return
+            
+            print("✅ Template created")
+            
+            # Store template
+            enroll_gui.root.after(0, lambda: enroll_gui.update_status("💾 Saving fingerprint...", "#9b59b6"))
+            
+            if finger.store_model(location) != adafruit_fingerprint.OK:
+                print("❌ Failed to store template")
+                enroll_gui.root.after(0, enroll_gui.show_failed)
+                return
+            
+            print(f"✅ Fingerprint stored in slot {location}")
+            
+            # Save to database
+            database = load_fingerprint_database()
+            
+            # Create database entry
+            enrollment_data = {
+                "name": user_info['full_name'],
+                "user_type": user_info['user_type'],
+                "unified_id": user_info.get('student_id') or user_info.get('staff_no'),
+                "license_number": user_info['license_number'],
+                "license_expiration": user_info['expiration_date'],
+                "plate_number": user_info['plate_number'],
+                "enrolled_date": time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            # Add type-specific fields
+            if user_info['user_type'] == 'STUDENT':
+                enrollment_data.update({
+                    "student_id": user_info['student_id'],
+                    "course": user_info['course']
+                })
+            else:  # STAFF
+                enrollment_data.update({
+                    "staff_no": user_info['staff_no'],
+                    "staff_role": user_info['staff_role']
+                })
+            
+            database[str(location)] = enrollment_data
+            save_fingerprint_database(database)
+            
+            print(f"✅ User enrolled successfully!")
+            print(f"📋 Name: {user_info['full_name']}")
+            print(f"🆔 ID: {enrollment_data['unified_id']}")
+            print(f"🔢 Slot: #{location}")
+            
+            # Show success
+            enroll_gui.root.after(0, enroll_gui.show_success)
+            
+        except Exception as e:
+            print(f"❌ Enrollment error: {e}")
+            enroll_gui.root.after(0, enroll_gui.show_failed)
+    
+    # Start enrollment in background thread
+    enrollment_thread = threading.Thread(target=run_enrollment, daemon=True)
+    enrollment_thread.start()
+    
+    # Wait for GUI to complete
+    result = enroll_gui.wait_for_result()
+    
+    if result:
+        print("🎉 Enrollment completed successfully!")
+    else:
+        print("❌ Enrollment failed or cancelled.")
 
 # VIEW Buttons
 def admin_view_enrolled():
