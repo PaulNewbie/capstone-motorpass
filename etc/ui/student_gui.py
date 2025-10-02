@@ -10,7 +10,7 @@ from typing import Dict
 import sys
 import queue
 
-from ..refresh import add_refresh_to_window
+from refresh import add_refresh_to_window
 
 class StudentVerificationGUI:
     def __init__(self, verification_function):
@@ -406,39 +406,37 @@ class StudentVerificationGUI:
             print(f"Error showing user info: {e}")
 
     def show_final_result(self, result):
-        """Show final verification result with responsive design"""
+        """Show final verification result - Clean & Professional Design"""
         try:
             self.verification_complete = True
             
-            # Result box with responsive sizing and positioning
-            result_width = max(400, int(self.screen_width * 0.4))
-            result_height = max(300, int(self.screen_height * 0.35))
+            # Clean, centered result card with golden background
+            card_width = 600
+            card_height = 400
             
-            result_box = tk.Frame(self.root, bg='#FFD700', relief='raised', bd=4,
-                                 width=result_width, height=result_height)
-            result_box.place(relx=0.5, rely=0.5, anchor='center')
-            result_box.pack_propagate(False)
+            # Create card with golden background and raised border
+            result_card = tk.Frame(self.root, bg='#FFD700', relief='raised', bd=4)
+            result_card.place(relx=0.5, rely=0.5, anchor='center', 
+                             width=card_width, height=card_height)
             
-            # Content with responsive spacing
-            content_padding_x = max(35, int(result_width * 0.09))
-            content_padding_y = max(25, int(result_height * 0.08))
-            
-            content = tk.Frame(result_box, bg='#FFD700')
-            content.pack(padx=content_padding_x, pady=content_padding_y, fill="both", expand=True)
+            # Inner content area with padding
+            content = tk.Frame(result_card, bg='#FFD700')
+            content.pack(fill='both', expand=True, padx=20, pady=20)
             
             if result.get('verified', False):
-                # Success - responsive icon and fonts
-                icon_font_size = max(35, int(min(self.screen_width, self.screen_height) / 20))
-                title_font_size = max(18, int(self.screen_width / 45))
-                welcome_font_size = max(14, int(self.screen_width / 60))
-                action_font_size = max(11, int(self.screen_width / 80))
+                # ===== SUCCESS LAYOUT =====
                 
-                icon_label = tk.Label(content, text="✅", font=("Arial", icon_font_size), bg='#FFD700')
-                icon_label.pack(pady=(0, max(10, int(result_height * 0.03))))
+                # Success icon
+                icon_label = tk.Label(content, text="✓", 
+                                    font=("Arial", 80, "bold"), 
+                                    fg="#4CAF50", bg='#FFD700')
+                icon_label.pack(pady=(40, 20))
                 
-                title = tk.Label(content, text="VERIFICATION SUCCESSFUL", 
-                               font=("Arial", title_font_size, "bold"), fg="#2E7D32", bg='#FFD700')
-                title.pack(pady=(0, max(10, int(result_height * 0.03))))
+                # Title
+                title = tk.Label(content, text="Verification Successful", 
+                               font=("Arial", 28, "bold"), 
+                               fg="#2E7D32", bg='#FFD700')
+                title.pack(pady=(0, 25))
                 
                 # Format name
                 name = result.get('name', 'User')
@@ -447,45 +445,71 @@ class StudentVerificationGUI:
                     if len(parts) >= 2:
                         name = f"{parts[1].strip()} {parts[0].strip()}"
                 
-                welcome = tk.Label(content, text=f"Welcome, {name}!", 
-                                 font=("Arial", welcome_font_size, "bold"), fg="#1B5E20", bg='#FFD700')
-                welcome.pack(pady=(0, max(8, int(result_height * 0.025))))
+                # Welcome message
+                welcome = tk.Label(content, text=f"Welcome, {name}", 
+                                 font=("Arial", 20), 
+                                 fg="#333333", bg='#FFD700')
+                welcome.pack(pady=(0, 15))
                 
-                # Time action
+                # Time info with icon
                 time_action = result.get('time_action', 'IN')
-                action_text = f"Time {time_action}: {result.get('timestamp', 'N/A')}"
+                timestamp = result.get('timestamp', 'N/A')
+                time_icon = "🕐" if time_action == 'IN' else "🕐"
                 
-                action_label = tk.Label(content, text=action_text, 
-                                       font=("Arial", action_font_size), fg="#424242", bg='#FFD700')
-                action_label.pack(pady=(0, max(4, int(result_height * 0.015))))
+                time_frame = tk.Frame(content, bg='#E8F5E9', bd=0)
+                time_frame.pack(pady=(10, 0), padx=40, fill='x')
+                
+                time_label = tk.Label(time_frame, 
+                                    text=f"{time_icon}  Time {time_action}: {timestamp}", 
+                                    font=("Arial", 16), 
+                                    fg="#1B5E20", bg='#E8F5E9',
+                                    pady=12)
+                time_label.pack()
                 
             else:
-                # Failure - responsive design
-                icon_font_size = max(35, int(min(self.screen_width, self.screen_height) / 20))
-                title_font_size = max(18, int(self.screen_width / 45))
-                reason_font_size = max(12, int(self.screen_width / 70))
+                # ===== FAILURE LAYOUT =====
                 
-                icon_label = tk.Label(content, text="❌", font=("Arial", icon_font_size), bg='#FFD700')
-                icon_label.pack(pady=(0, max(10, int(result_height * 0.03))))
+                # Error icon
+                icon_label = tk.Label(content, text="✕", 
+                                    font=("Arial", 80, "bold"), 
+                                    fg="#F44336", bg='#FFD700')
+                icon_label.pack(pady=(40, 20))
                 
-                title = tk.Label(content, text="VERIFICATION FAILED", 
-                               font=("Arial", title_font_size, "bold"), fg="#C62828", bg='#FFD700')
-                title.pack(pady=(0, max(10, int(result_height * 0.03))))
+                # Title
+                title = tk.Label(content, text="Verification Failed", 
+                               font=("Arial", 28, "bold"), 
+                               fg="#C62828", bg='#FFD700')
+                title.pack(pady=(0, 30))
                 
-                reason_wrap_length = max(300, int(result_width * 0.75))
-                reason = tk.Label(content, text=result.get('reason', 'Unknown error'), 
-                                font=("Arial", reason_font_size), fg="#424242", bg='#FFD700', 
-                                wraplength=reason_wrap_length)
-                reason.pack(pady=(0, max(8, int(result_height * 0.025))))
+                # Error message box
+                error_frame = tk.Frame(content, bg='#FFEBEE', bd=0)
+                error_frame.pack(pady=(0, 20), padx=50, fill='x')
+                
+                reason_text = result.get('reason', 'Unknown error')
+                reason = tk.Label(error_frame, 
+                                text=reason_text, 
+                                font=("Arial", 16), 
+                                fg="#C62828", bg='#FFEBEE',
+                                wraplength=480,
+                                justify='center',
+                                pady=15)
+                reason.pack()
+                
+                # Help text
+                help_text = tk.Label(content, 
+                                   text="Please contact security if you need assistance", 
+                                   font=("Arial", 12), 
+                                   fg="#757575", bg='#FFD700')
+                help_text.pack(pady=(10, 0))
             
-            # Auto close with responsive timing
+            # Auto close with timing
             close_delay = 4000 if result.get('verified', False) else 5000
             self.root.after(close_delay, self.close)
             
         except Exception as e:
             print(f"Error showing final result: {e}")
             self.close()
-
+                    
     def update_status(self, updates):
         """Update status from verification thread"""
         try:

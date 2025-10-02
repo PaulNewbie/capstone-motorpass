@@ -62,39 +62,54 @@ def restart_application():
     sys.exit(0)
 
 def student_wrapper(main_window=None):
-    """Simple wrapper - just hide window, run process, restart"""
+    """Simple wrapper - hide window, run process, then restart"""
     try:
         if main_window:
             main_window.withdraw()  # Hide main window for student
         
         result = student_verification()  # Run your original function
         
+        # Only restart after verification completes successfully
+        restart_application()
         return result
-    finally:
-        restart_application()  # Always restart after
+        
+    except Exception as e:
+        print(f"❌ Error in student verification: {e}")
+        # Only restart on error if needed
+        restart_application()
+        raise
 
 def guest_wrapper(main_window=None):
-    """Simple wrapper - just hide window, run process, restart"""
+    """Simple wrapper - hide window, run process, then restart"""
     try:
         if main_window:
             main_window.withdraw()  # Hide main window for guest
         
         result = guest_verification()  # Run your original function
         
+        # Only restart after verification completes
+        restart_application()
         return result
-    finally:
-        restart_application()  # Always restart after
+        
+    except Exception as e:
+        print(f"❌ Error in guest verification: {e}")
+        restart_application()
+        raise
 
 def admin_wrapper(main_window=None):
     """FIXED: Don't hide main window - let admin authentication handle it"""
     try:
         # DON'T hide main_window here - pass it to admin_panel instead
-        # The AdminFingerprintGUI will handle hiding it ONLY after successful auth
-        result = admin_panel(main_window=main_window)  # Pass main_window to admin_panel
+        result = admin_panel(main_window=main_window)
         
+        # Only restart after admin completes
+        restart_application()
         return result
-    finally:
-        restart_application()  # Always restart after
+        
+    except Exception as e:
+        print(f"❌ Error in admin panel: {e}")
+        restart_application()
+        raise
 
 def main():
     """Main function - unchanged except using wrappers"""
