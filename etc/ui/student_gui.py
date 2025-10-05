@@ -126,9 +126,9 @@ class StudentVerificationGUI:
         
         # Title with responsive font
         title_font_size = max(24, int(min(self.screen_width, self.screen_height) / 32))
-        title_label = tk.Label(content_frame, text="STUDENT/STAFF VERIFICATION", 
-                              font=("Arial", title_font_size, "bold"), fg="#FFFFFF", bg='#8B4513')
-        title_label.pack(pady=(0, max(15, int(self.screen_height * 0.02))))
+        self.main_title_label = tk.Label(content_frame, text="STUDENT/STAFF VERIFICATION", 
+                      font=("Arial", title_font_size, "bold"), fg="#FFFFFF", bg='#8B4513')
+        self.main_title_label.pack(pady=(0, max(15, int(self.screen_height * 0.02))))
         
         # Main content panels
         panels_container = tk.Frame(content_frame, bg='#8B4513')
@@ -220,50 +220,47 @@ class StudentVerificationGUI:
                 fg="#FFFFFF", bg='#46230a').pack(padx=10, pady=(0, 8))
 
     def create_left_panel(self, parent):
-        """Create responsive left panel with status indicators AND user info"""
+        """Create responsive left panel with ONLY verification steps - NO user info"""
         left_frame = tk.Frame(parent, bg='#8B4513')
-        panel_spacing = max(15, int(self.screen_width * 0.02))
-        left_frame.pack(side="left", fill="both", expand=True, padx=(0, panel_spacing))
+        left_frame.pack(side="left", fill="both", expand=True)
         
-        # Status container with responsive sizing
-        status_container = tk.Frame(left_frame, bg='white', relief='raised', bd=3)
-        status_container.pack(fill="both", expand=True)
+        # Verification steps container
+        steps_container = tk.Frame(left_frame, bg='white', relief='raised', bd=3)
+        steps_container.pack(fill="both", expand=True)
         
         # Title with responsive font
-        title_font_size = max(16, int(self.screen_width / 50))
-        title_padding_y = max(15, int(self.screen_height * 0.02))
+        title_font_size = max(18, int(self.screen_width / 45))
+        title_padding_y = max(18, int(self.screen_height * 0.025))
         
-        tk.Label(status_container, text="VERIFICATION STATUS", 
+        tk.Label(steps_container, text="VERIFICATION STEPS", 
                 font=("Arial", title_font_size, "bold"), fg="#333333", bg='white').pack(pady=title_padding_y)
         
-        # Status items with responsive spacing
-        status_padding_x = max(20, int(self.screen_width * 0.02))
-        status_padding_y = max(15, int(self.screen_height * 0.02))
+        # Steps content with responsive padding
+        steps_padding_x = max(20, int(self.screen_width * 0.02))
+        steps_padding_y = max(15, int(self.screen_height * 0.02))
         
-        status_items_frame = tk.Frame(status_container, bg='white')
-        status_items_frame.pack(fill="x", padx=status_padding_x, pady=(0, status_padding_y))
+        steps_frame = tk.Frame(steps_container, bg='white')
+        steps_frame.pack(fill="both", expand=True, padx=steps_padding_x, pady=(0, steps_padding_y))
         
-        self.create_status_item(status_items_frame, "🪖 HELMET CHECK:", self.helmet_status, 0)
-        self.create_status_item(status_items_frame, "👆 FINGERPRINT:", self.fingerprint_status, 1)
-        self.create_status_item(status_items_frame, "🪪 LICENSE CHECK:", self.license_status, 2)
+        # Create the three verification steps using existing create_status_item method
+        self.create_status_item(steps_frame, "🪖 HELMET CHECK", self.helmet_status, 'helmet')
+        self.create_status_item(steps_frame, "🔒 FINGERPRINT SCAN", self.fingerprint_status, 'fingerprint')
+        self.create_status_item(steps_frame, "📄 LICENSE VERIFICATION", self.license_status, 'license')
         
-        # User authenticated section (moved here from right panel) with responsive spacing
-        user_info_padding_y = max(12, int(self.screen_height * 0.015))
+        # Current Step Display with responsive font
+        current_step_padding = max(25, int(self.screen_height * 0.035))
+        current_step_font = max(11, int(self.screen_width / 75))
         
-        self.user_info_panel = tk.Frame(status_container, bg='#e3f2fd', relief='ridge', bd=2)
-        
-        user_title_font = max(13, int(self.screen_width / 65))
-        tk.Label(self.user_info_panel, text="👤 USER AUTHENTICATED", 
-                font=("Arial", user_title_font, "bold"), fg="#1565c0", bg='#e3f2fd').pack(pady=user_info_padding_y)
-        
-        self.user_details_frame = tk.Frame(self.user_info_panel, bg='#e3f2fd')
-        details_padding_x = max(15, int(self.screen_width * 0.015))
-        details_padding_y = max(15, int(self.screen_height * 0.015))
-        self.user_details_frame.pack(padx=details_padding_x, pady=(0, details_padding_y))
-        
-        # Initially hidden
-        self.user_info_panel.pack_forget()
+        self.current_step_label = tk.Label(steps_container, 
+            textvariable=self.current_step, 
+            font=("Arial", current_step_font), 
+            fg="#1565c0", 
+            bg='white', 
+            wraplength=max(300, int(self.screen_width * 0.3)),
+            justify="center")
+        self.current_step_label.pack(pady=current_step_padding)
 
+        
     def create_status_item(self, parent, label_text, status_var, row):
         """Create individual status item with responsive design"""
         # Container for this item with responsive spacing
@@ -309,17 +306,17 @@ class StudentVerificationGUI:
             return
             
         status_configs = {
-            "VERIFIED": ("#27ae60", "✅", "#27ae60"),      # Green
-            "VALID": ("#27ae60", "✅", "#27ae60"),
-            "PROCESSING": ("#f39c12", "⏳", "#f39c12"),    # Orange
-            "CHECKING": ("#3498db", "🔍", "#3498db"),      # Blue
-            "FAILED": ("#e74c3c", "❌", "#e74c3c"),        # Red
+            "VERIFIED": ("#27ae60", "✔️", "#27ae60"),      # Green checkmark emoji
+            "VALID": ("#27ae60", "✔️", "#27ae60"),
+            "PROCESSING": ("#f39c12", "[-]", "#f39c12"),    # Keep hourglass
+            "CHECKING": ("#3498db", "?", "#3498db"),      # Keep magnifying glass
+            "FAILED": ("#e74c3c", "❌", "#e74c3c"),         # X emoji
             "INVALID": ("#e74c3c", "❌", "#e74c3c"),
-            "PENDING": ("#95a5a6", "⏸", "#95a5a6"),        # Gray
-            "EXPIRED": ("#e74c3c", "⚠️", "#e74c3c")
+            "PENDING": ("#95a5a6", "...", "#95a5a6"),       # Pause emoji
+            "EXPIRED": ("#e74c3c", "⚠️", "#e74c3c")        # Warning emoji
         }
         
-        config = status_configs.get(status.upper(), ("#95a5a6", "⏸", "#95a5a6"))
+        config = status_configs.get(status.upper(), ("#95a5a6", "[-]", "#95a5a6"))
         
         # Update badge with responsive styling
         badge_font_size = max(10, int(self.screen_width / 85))
@@ -328,32 +325,39 @@ class StudentVerificationGUI:
         icon.config(text=config[1], fg=config[2], font=("Arial", icon_font_size))
 
     def create_right_panel(self, parent):
-        """Create responsive right panel - empty with camera feed title"""
+        """Create responsive right panel with student/staff information"""
         right_frame = tk.Frame(parent, bg='#8B4513')
         right_frame.pack(side="right", fill="both", expand=True)
         
-        # Camera feed container (same size as original details container)
-        camera_container = tk.Frame(right_frame, bg='white', relief='raised', bd=3)
-        camera_container.pack(fill="both", expand=True)
+        # Details container
+        details_container = tk.Frame(right_frame, bg='white', relief='raised', bd=3)
+        details_container.pack(fill="both", expand=True)
         
-        # Camera feed title with responsive font
-        camera_title_font = max(16, int(self.screen_width / 50))
-        camera_title_padding = max(15, int(self.screen_height * 0.02))
+        # Title with responsive font
+        title_font_size = max(16, int(self.screen_width / 50))
+        title_padding_y = max(15, int(self.screen_height * 0.02))
         
-        tk.Label(camera_container, text="📹 CAMERA FEED", 
-                font=("Arial", camera_title_font, "bold"), fg="#333333", bg='white').pack(pady=camera_title_padding)
+        self.user_type_title_label = tk.Label(details_container, text="STUDENT/STAFF INFORMATION", 
+            font=("Arial", title_font_size, "bold"), fg="#333333", bg='white')
+        self.user_type_title_label.pack(pady=title_padding_y)
         
-        # Empty space to maintain size
-        empty_frame = tk.Frame(camera_container, bg='white')
-        empty_padding_x = max(15, int(self.screen_width * 0.015))
-        empty_padding_y = max(8, int(self.screen_height * 0.01))
-        empty_frame.pack(fill="both", expand=True, padx=empty_padding_x, pady=empty_padding_y)
+        # Details content with responsive padding
+        details_padding_x = max(15, int(self.screen_width * 0.015))
+        details_padding_y = max(8, int(self.screen_height * 0.01))
         
-        # Optional: Simple message with responsive font
+        self.details_content = tk.Frame(details_container, bg='white')
+        self.details_content.pack(fill="both", expand=True, padx=details_padding_x, pady=details_padding_y)
+        
+        # Initial message with responsive font
         message_font_size = max(11, int(self.screen_width / 80))
-        tk.Label(empty_frame, text="Terminal Camera Active\nCheck terminal for camera operations", 
-                font=("Arial", message_font_size), fg="#666666", bg='white', justify="center").pack(expand=True)
-
+        self.initial_message = tk.Label(self.details_content, 
+                                       text="Starting verification...\nPlease check the terminal window for camera operations.", 
+                                       font=("Arial", message_font_size), fg="#666666", bg='white', justify="center")
+        self.initial_message.pack(expand=True)
+        
+        # Hidden panels for later use
+        self.create_hidden_panels()
+    
     def create_footer(self, parent):
         """Create responsive footer"""
         # Calculate responsive footer height
@@ -369,12 +373,50 @@ class StudentVerificationGUI:
         footer_text = "🪖 Helmet Check → 🔒 Fingerprint Scan → 📄 License Verification | ESC to exit"
         tk.Label(footer, text=footer_text, font=("Arial", footer_font_size), 
                 fg="#FFFFFF", bg='#46230a').pack(expand=True)
+                
+    def create_hidden_panels(self):
+        """Create panels that will be shown later with responsive design"""
+        # User info panel
+        self.user_info_panel_right = tk.Frame(self.details_content, bg='#e3f2fd', relief='ridge', bd=2)
+        
+        # Responsive font for panel titles
+        panel_title_font = max(13, int(self.screen_width / 65))
+        panel_title_padding = max(12, int(self.screen_height * 0.015))
+        
+        tk.Label(self.user_info_panel_right, text="👤 USER DETAILS", 
+                font=("Arial", panel_title_font, "bold"), fg="#1565c0", bg='#e3f2fd').pack(pady=panel_title_padding)
+        
+        self.user_details_frame_right = tk.Frame(self.user_info_panel_right, bg='#e3f2fd')
+        details_padding_x = max(15, int(self.screen_width * 0.015))
+        details_padding_y = max(15, int(self.screen_height * 0.015))
+        self.user_details_frame_right.pack(padx=details_padding_x, pady=(0, details_padding_y))
 
     def show_user_info(self, user_info):
-        """Display user information in LEFT panel with responsive design"""
+        """Display user information in RIGHT panel with responsive design"""
         try:
+            # Hide initial message
+            if hasattr(self, 'initial_message'):
+                self.initial_message.pack_forget()
+                
+            user_type = user_info.get('user_type', 'STUDENT')
+        
+            if user_type == 'STAFF':
+                # Update main title
+                if hasattr(self, 'main_title_label'):
+                    self.main_title_label.config(text="STAFF VERIFICATION")
+                # Update right panel title
+                if hasattr(self, 'user_type_title_label'):
+                    self.user_type_title_label.config(text="STAFF INFORMATION")
+            else:
+                # Update main title
+                if hasattr(self, 'main_title_label'):
+                    self.main_title_label.config(text="STUDENT VERIFICATION")
+                # Update right panel title
+                if hasattr(self, 'user_type_title_label'):
+                    self.user_type_title_label.config(text="STUDENT INFORMATION")
+                
             # Clear previous details
-            for widget in self.user_details_frame.winfo_children():
+            for widget in self.user_details_frame_right.winfo_children():
                 widget.destroy()
             
             # Create info labels with responsive fonts
@@ -390,7 +432,7 @@ class StudentVerificationGUI:
             
             for label, value in info_items:
                 row_spacing = max(2, int(self.screen_height * 0.003))
-                row = tk.Frame(self.user_details_frame, bg='#e3f2fd')
+                row = tk.Frame(self.user_details_frame_right, bg='#e3f2fd')
                 row.pack(fill="x", pady=row_spacing)
                 
                 label_width = max(10, int(self.screen_width / 85))
@@ -401,7 +443,7 @@ class StudentVerificationGUI:
             
             # Show the user info panel with responsive spacing
             panel_spacing_y = max(15, int(self.screen_height * 0.02))
-            self.user_info_panel.pack(fill="x", pady=(panel_spacing_y, 0))
+            self.user_info_panel_right.pack(fill="both", expand=True, pady=(0, panel_spacing_y))
         except Exception as e:
             print(f"Error showing user info: {e}")
 
@@ -522,6 +564,7 @@ class StudentVerificationGUI:
                     self.license_status.set(value)
                 elif key == 'current_step':
                     self.current_step.set(value)
+                    self.root.update_idletasks()  # Force GUI update
                 elif key == 'user_info':
                     self.show_user_info(value)
                 elif key == 'verification_summary':

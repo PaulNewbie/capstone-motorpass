@@ -30,7 +30,7 @@ finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
 
 # =================== FOR ADMIN AUTHENTICATION ===================
 
-def authenticate_admin_with_role(max_attempts=2, main_window=None):  # CHANGED: 3 -> 2
+def authenticate_admin_with_role(max_attempts=3, main_window=None):  
     """Authenticate admin and return role - FOR ADMIN BUTTON ONLY"""
     from etc.ui.fingerprint_gui import AdminFingerprintGUI
     

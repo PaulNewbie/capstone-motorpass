@@ -14,7 +14,7 @@ from etc.utils.hardware_utils import finger
 
 # =================== STUDENT/STAFF AUTHENTICATION ===================
 
-def authenticate_fingerprint(max_attempts=2):  # ⚠️ CHANGED: 5 -> 2 ⚠️
+def authenticate_fingerprint(max_attempts=3):  
     """Student/Staff fingerprint authentication with GUI"""
     print(f"\n🔒 Starting fingerprint authentication (Max attempts: {max_attempts})")
     

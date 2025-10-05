@@ -84,7 +84,7 @@ def run_verification_with_gui(status_callback):
         status_callback({'current_step': '🔍 Please place your finger on the scanner'})
         status_callback({'fingerprint_status': 'PROCESSING'})
 
-        user_info = authenticate_fingerprint(max_attempts=2)
+        user_info = authenticate_fingerprint(max_attempts=3)
         
         if not user_info:
             status_callback({'fingerprint_status': 'FAILED'})
@@ -180,13 +180,12 @@ def run_verification_with_gui(status_callback):
                 set_led_failed_fast_blink()
                 cleanup_buzzer()
                 return {'verified': False, 'reason': 'License has expired'}
-            
-            # License is valid
-            status_callback({'license_status': 'VALID'})
+
             
             # Step 3: Fixed License capture and verification with proper file handling
             status_callback({'current_step': '📄 Capturing license... (Check terminal for camera)'})
-
+            status_callback({'license_status': 'CHECKING'})
+            
             print("\n" + "="*60)
             print("📄 LICENSE CAPTURE (Terminal Camera)")
             print("="*60)
@@ -239,6 +238,7 @@ def run_verification_with_gui(status_callback):
                     if verification_result:
                         # SUCCESS - License matched
                         license_success = True
+                        status_callback({'license_status': 'VALID'}) 
                         break
                         
                     else:

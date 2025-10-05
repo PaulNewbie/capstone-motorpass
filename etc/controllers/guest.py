@@ -115,6 +115,19 @@ def run_guest_verification_with_gui(status_callback):
             
             print(f"📄 Detected name: {detected_name}")
             
+            # Check if detected name is a student/staff
+            is_student_staff, match_info = check_if_student_or_staff_name(detected_name)
+            if is_student_staff:
+                print(f"❌ Student/Staff detected as visitor - Access DENIED")
+                print(f"   Match found: {match_info}")
+                status_callback({'current_step': f'❌ Student/Staff NOT allowed as visitors - {match_info}'})
+                safe_delete_temp_file(image_path)
+                set_led_idle()
+                play_failure()
+                set_led_failed_fast_blink()
+                cleanup_buzzer()
+                return {'verified': False, 'reason': f'Student/Staff not allowed as visitors - {match_info}'}
+            
             # Check guest status - LENIENT MATCHING
             current_status, guest_info = get_guest_time_status(detected_name)
             
@@ -310,6 +323,45 @@ def run_guest_verification_with_gui(status_callback):
         set_led_failed_fast_blink()
         cleanup_buzzer()
         return {'verified': False, 'reason': str(e)}
+        
+def check_if_student_or_staff_name(name):
+    """Check if detected name matches any student or staff in database using fuzzy matching"""
+    try:
+        from database.db_operations import get_all_students, get_all_staff
+    except ImportError:
+        return False, None
+    
+    if not name or name == "Guest":
+        return False, None
+    
+    # Use similarity threshold (70% match) - same as your existing name matching logic
+    SIMILARITY_THRESHOLD = 0.70
+    
+    # Check students
+    try:
+        students = get_all_students()
+        for student in students:
+            similarity = difflib.SequenceMatcher(None, 
+                                                name.lower().strip(), 
+                                                student['full_name'].lower().strip()).ratio()
+            if similarity >= SIMILARITY_THRESHOLD:
+                return True, f"STUDENT: {student['full_name']} ({student.get('student_id', 'N/A')}) - {similarity*100:.1f}% match"
+    except:
+        pass
+    
+    # Check staff
+    try:
+        staff = get_all_staff()
+        for staff_member in staff:
+            similarity = difflib.SequenceMatcher(None, 
+                                                name.lower().strip(), 
+                                                staff_member['full_name'].lower().strip()).ratio()
+            if similarity >= SIMILARITY_THRESHOLD:
+                return True, f"STAFF: {staff_member['full_name']} ({staff_member.get('staff_no', 'N/A')}) - {similarity*100:.1f}% match"
+    except:
+        pass
+    
+    return False, None
                       
 def store_guest_in_database(guest_info):
     """FIXED: Store guest with safe Firebase sync"""

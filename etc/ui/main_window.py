@@ -372,12 +372,12 @@ class MotorPassGUI:
         deco_line = tk.Frame(title_container, bg='#D4AF37', height=2)
         deco_line.pack(fill="x", pady=(10, 5))
         
-        title_label = tk.Label(title_container, text="YOU ARE A:", 
+        title_label = tk.Label(title_container, text="SELECT USERS:", 
                               font=("Arial", title_font_size, "bold"), fg="#F5DEB3", bg='#3d2317')
         title_label.pack(expand=True)
         
         # Subtitle for better context
-        subtitle_label = tk.Label(title_container, text="Please select your access level", 
+        subtitle_label = tk.Label(title_container, text="Always have a safe trip!", 
                                  font=("Arial", subtitle_font_size), fg="#D4AF37", bg='#3d2317')
         subtitle_label.pack(pady=(0, 10))
         

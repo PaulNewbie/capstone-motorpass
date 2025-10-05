@@ -156,7 +156,7 @@ class AdminFingerprintGUI:
 class FingerprintAuthGUI:
     """Enhanced Fingerprint Authentication GUI for students/staff"""
     
-    def __init__(self, max_attempts=5):
+    def __init__(self, max_attempts=3):
         self.max_attempts = max_attempts
         self.current_attempt = 0
         self.auth_result = None
@@ -407,6 +407,6 @@ def create_admin_auth_gui(parent_window=None):
     """Create and return AdminFingerprintGUI instance"""
     return AdminFingerprintGUI(parent_window)
 
-def create_fingerprint_auth_gui(max_attempts=5):
+def create_fingerprint_auth_gui(max_attempts=3):
     """Create and return FingerprintAuthGUI instance"""
     return FingerprintAuthGUI(max_attempts)

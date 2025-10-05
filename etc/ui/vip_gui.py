@@ -37,7 +37,7 @@ def handle_vip_access(parent_root):
             import time
             
             attempts = 0
-            max_attempts = 2  # CHANGED: 3 -> 2
+            max_attempts = 3 
             
             while attempts < max_attempts:
                 attempts += 1
