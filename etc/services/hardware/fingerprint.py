@@ -22,13 +22,15 @@ from etc.utils.json_database import (
     safe_get_staff_by_id
 )
 
+from etc.services.hardware.buzzer_control import play_failure
+
 # =================== HARDWARE SETUP ===================
 uart = serial.Serial("/dev/ttyS0", baudrate=57600, timeout=1)
 finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
 
 # =================== FOR ADMIN AUTHENTICATION ===================
 
-def authenticate_admin_with_role(max_attempts=3, main_window=None):
+def authenticate_admin_with_role(max_attempts=2, main_window=None):  # CHANGED: 3 -> 2
     """Authenticate admin and return role - FOR ADMIN BUTTON ONLY"""
     from etc.ui.fingerprint_gui import AdminFingerprintGUI
     
@@ -65,6 +67,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                         time.sleep(2)
                         continue
                     else:
+                        # ADDED: Trigger buzzer alarm on final failure
+                        play_failure()
                         admin_gui.root.after(0, admin_gui.show_failed)
                         return
                 
@@ -78,6 +82,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                             time.sleep(2)
                             continue
                         else:
+                            # ADDED: Trigger buzzer alarm on final failure
+                            play_failure()
                             admin_gui.root.after(0, admin_gui.show_failed)
                             return
                 except:
@@ -86,6 +92,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                         time.sleep(2)
                         continue
                     else:
+                        # ADDED: Trigger buzzer alarm on final failure
+                        play_failure()
                         admin_gui.root.after(0, admin_gui.show_failed)
                         return
                 
@@ -99,6 +107,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                             time.sleep(2)
                             continue
                         else:
+                            # ADDED: Trigger buzzer alarm on final failure
+                            play_failure()
                             admin_gui.root.after(0, admin_gui.show_failed)
                             return
                 except:
@@ -107,6 +117,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                         time.sleep(2)
                         continue
                     else:
+                        # ADDED: Trigger buzzer alarm on final failure
+                        play_failure()
                         admin_gui.root.after(0, admin_gui.show_failed)
                         return
                 
@@ -146,6 +158,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                                 time.sleep(2)
                                 continue
                             else:
+                                # ADDED: Trigger buzzer alarm on final failure
+                                play_failure()
                                 admin_gui.root.after(0, admin_gui.show_failed)
                                 return
                         
@@ -160,6 +174,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                                 time.sleep(2)
                                 continue
                             else:
+                                # ADDED: Trigger buzzer alarm on final failure
+                                play_failure()
                                 admin_gui.root.after(0, admin_gui.show_failed)
                                 return
                         
@@ -174,6 +190,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                             time.sleep(2)
                             continue
                         else:
+                            # ADDED: Trigger buzzer alarm on final failure
+                            play_failure()
                             admin_gui.root.after(0, admin_gui.show_failed)
                             return
                 
@@ -181,7 +199,8 @@ def authenticate_admin_with_role(max_attempts=3, main_window=None):
                 admin_gui.root.after(0, admin_gui.show_success)
                 return
             
-            # All attempts failed
+            # All attempts failed - trigger alarm
+            play_failure()
             admin_gui.root.after(0, admin_gui.show_failed)
         
         # Start authentication in thread

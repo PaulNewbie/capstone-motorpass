@@ -5,6 +5,7 @@ from tkinter import messagebox, ttk
 import threading
 import time
 
+from etc.services.hardware.buzzer_control import play_failure
 from etc.services.hardware.fingerprint import finger, load_fingerprint_database, safe_get_student_by_id, safe_get_staff_by_id
 import adafruit_fingerprint
 

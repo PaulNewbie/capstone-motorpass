@@ -10,6 +10,8 @@ from etc.controllers.vip import (
     validate_vip_plate_format
 )
 
+from etc.services.hardware.buzzer_control import play_failure
+
 def handle_vip_access(parent_root):
     """Handle VIP access button click with fingerprint authentication GUI"""
     print("\n🌟 VIP ACCESS REQUESTED")
@@ -17,41 +19,35 @@ def handle_vip_access(parent_root):
     
     # CRITICAL: Ensure main window stays visible throughout entire VIP process
     if parent_root:
-        parent_root.deiconify()           # Make sure main window is visible
-        parent_root.attributes('-topmost', False)  # Don't force on top
+        parent_root.deiconify()
+        parent_root.attributes('-topmost', False)
     
-    # Import and use the AdminFingerprintGUI (same as Admin button uses)
     try:
         from etc.ui.fingerprint_gui import AdminFingerprintGUI
         import threading
         
         print("Using AdminFingerprintGUI for VIP authentication...")
         
-        # Create the fingerprint GUI (will keep main window visible as background)
         admin_gui = AdminFingerprintGUI(parent_root)
-        
-        # Store guard info for later use
         guard_info = {'name': None, 'slot': None, 'fingerprint_id': None}
         
         def run_auth():
-            # This runs the same authentication logic as Admin button
             from etc.services.hardware.fingerprint import finger, adafruit_fingerprint
             from etc.utils.json_database import load_admin_database, load_fingerprint_database
             import time
             
             attempts = 0
-            max_attempts = 3
+            max_attempts = 2  # CHANGED: 3 -> 2
             
             while attempts < max_attempts:
                 attempts += 1
                 print(f"VIP Auth attempt {attempts}/{max_attempts}")
                 
-                # Update GUI
                 admin_gui.root.after(0, lambda: admin_gui.update_status(f"👆 Place admin finger... (Attempt {attempts}/{max_attempts})", "#3498db"))
                 
-                # Wait for finger and process
+                # Wait for finger
                 finger_detected = False
-                for _ in range(100):  # 10 second timeout
+                for _ in range(100):
                     try:
                         if finger.get_image() == adafruit_fingerprint.OK:
                             finger_detected = True
@@ -62,14 +58,18 @@ def handle_vip_access(parent_root):
                 
                 if not finger_detected:
                     if attempts < max_attempts:
-                        admin_gui.root.after(0, lambda: admin_gui.update_status("⏰ Timeout! Try again...", "#e74c3c"))
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("⏰ Timeout! Try again...", "#e67e22"))
                         time.sleep(2)
                         continue
                     else:
+                        # ADDED: Trigger buzzer alarm on final failure
+                        play_failure()
                         admin_gui.root.after(0, admin_gui.show_failed)
                         return
                 
                 # Process fingerprint
+                admin_gui.root.after(0, lambda: admin_gui.update_status("🔄 Processing...", "#f39c12"))
+                
                 try:
                     if finger.image_2_tz(1) != adafruit_fingerprint.OK:
                         if attempts < max_attempts:
@@ -77,25 +77,43 @@ def handle_vip_access(parent_root):
                             time.sleep(2)
                             continue
                         else:
+                            # ADDED: Trigger buzzer alarm on final failure
+                            play_failure()
                             admin_gui.root.after(0, admin_gui.show_failed)
                             return
-                    
-                    # Search for fingerprint match
+                except:
+                    if attempts < max_attempts:
+                        admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Sensor error! Try again...", "#e74c3c"))
+                        time.sleep(2)
+                        continue
+                    else:
+                        # ADDED: Trigger buzzer alarm on final failure
+                        play_failure()
+                        admin_gui.root.after(0, admin_gui.show_failed)
+                        return
+                
+                # Search for fingerprint
+                admin_gui.root.after(0, lambda: admin_gui.update_status("🔍 Searching...", "#9b59b6"))
+                
+                try:
                     if finger.finger_search() != adafruit_fingerprint.OK:
                         if attempts < max_attempts:
                             admin_gui.root.after(0, lambda: admin_gui.update_status("❌ No match found! Try again...", "#e74c3c"))
                             time.sleep(2)
                             continue
                         else:
+                            # ADDED: Trigger buzzer alarm on final failure
+                            play_failure()
                             admin_gui.root.after(0, admin_gui.show_failed)
                             return
-                            
                 except:
                     if attempts < max_attempts:
                         admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Search failed! Try again...", "#e74c3c"))
                         time.sleep(2)
                         continue
                     else:
+                        # ADDED: Trigger buzzer alarm on final failure
+                        play_failure()
                         admin_gui.root.after(0, admin_gui.show_failed)
                         return
                 
@@ -103,7 +121,6 @@ def handle_vip_access(parent_root):
                 
                 # Capture guard information
                 if matched_slot == "1":
-                    # Slot 1 = Super Admin
                     try:
                         admin_db = load_admin_database()
                         user_name = admin_db.get("1", {}).get("name", "Super Admin")
@@ -116,7 +133,6 @@ def handle_vip_access(parent_root):
                     print(f"✅ Super Admin authenticated: {user_name} (Slot 1)")
                     
                 elif matched_slot == "2":
-                    # Slot 2 = Guard
                     try:
                         fingerprint_db = load_fingerprint_database()
                         user_name = fingerprint_db.get("2", {}).get("name", "Guard User")
@@ -129,7 +145,6 @@ def handle_vip_access(parent_root):
                     print(f"✅ Guard authenticated: {user_name} (Slot 2)")
                     
                 else:
-                    # All other slots = Check if they exist and are staff
                     try:
                         fingerprint_db = load_fingerprint_database()
                         
@@ -139,6 +154,8 @@ def handle_vip_access(parent_root):
                                 time.sleep(2)
                                 continue
                             else:
+                                # ADDED: Trigger buzzer alarm on final failure
+                                play_failure()
                                 admin_gui.root.after(0, admin_gui.show_failed)
                                 return
                         
@@ -146,13 +163,15 @@ def handle_vip_access(parent_root):
                         user_type = finger_info.get('user_type')
                         user_name = finger_info.get('name', 'Unknown')
                         
-                        # Only STAFF can access admin panel (not students)
+                        # Only STAFF can access admin panel
                         if user_type != 'STAFF':
                             if attempts < max_attempts:
                                 admin_gui.root.after(0, lambda: admin_gui.update_status("❌ Only staff can access admin! Try again...", "#e74c3c"))
                                 time.sleep(2)
                                 continue
                             else:
+                                # ADDED: Trigger buzzer alarm on final failure
+                                play_failure()
                                 admin_gui.root.after(0, admin_gui.show_failed)
                                 return
                         
@@ -168,6 +187,8 @@ def handle_vip_access(parent_root):
                             time.sleep(2)
                             continue
                         else:
+                            # ADDED: Trigger buzzer alarm on final failure
+                            play_failure()
                             admin_gui.root.after(0, admin_gui.show_failed)
                             return
                 
@@ -175,7 +196,8 @@ def handle_vip_access(parent_root):
                 admin_gui.root.after(0, admin_gui.show_success)
                 return
             
-            # All attempts failed
+            # All attempts failed - trigger alarm
+            play_failure()
             admin_gui.root.after(0, admin_gui.show_failed)
         
         # Start authentication in thread
@@ -185,10 +207,9 @@ def handle_vip_access(parent_root):
         # Wait for GUI to close
         admin_gui.root.wait_window()
         
-        # Use the AdminFingerprintGUI's auth_result
         authenticated = admin_gui.auth_result
         
-        # CRITICAL: Ensure main window is still visible after authentication
+        # Keep main window visible
         if parent_root:
             parent_root.deiconify()
             parent_root.lift()
@@ -200,10 +221,6 @@ def handle_vip_access(parent_root):
             
         print("✅ Authentication successful - Opening VIP access panel")
         
-    except ImportError as e:
-        print(f"❌ Import error: {e}")
-        messagebox.showerror("Error", f"Could not import GUI authentication: {str(e)}")
-        return
     except Exception as e:
         print(f"❌ VIP authentication error: {e}")
         messagebox.showerror("Error", f"Authentication failed: {str(e)}")

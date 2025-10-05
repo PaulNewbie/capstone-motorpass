@@ -84,7 +84,7 @@ def run_verification_with_gui(status_callback):
         status_callback({'current_step': '🔍 Please place your finger on the scanner'})
         status_callback({'fingerprint_status': 'PROCESSING'})
 
-        user_info = authenticate_fingerprint(max_attempts=5)
+        user_info = authenticate_fingerprint(max_attempts=2)
         
         if not user_info:
             status_callback({'fingerprint_status': 'FAILED'})
@@ -93,7 +93,7 @@ def run_verification_with_gui(status_callback):
             play_failure()
             set_led_failed_fast_blink()
             cleanup_buzzer()
-            return {'verified': False, 'reason': 'Fingerprint authentication failed after 5 attempts'}
+            return {'verified': False, 'reason': 'Fingerprint authentication failed after 2 attempts'}
         
         status_callback({'fingerprint_status': 'VERIFIED'})
         status_callback({'user_info': user_info})

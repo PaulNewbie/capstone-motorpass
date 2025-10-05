@@ -1,6 +1,4 @@
 # etc/controllers/auth/student_auth.py
-# Student/Staff fingerprint authentication functions
-
 import time
 import serial
 import adafruit_fingerprint
@@ -16,14 +14,14 @@ from etc.utils.hardware_utils import finger
 
 # =================== STUDENT/STAFF AUTHENTICATION ===================
 
-def authenticate_fingerprint(max_attempts=5):
+def authenticate_fingerprint(max_attempts=2):  # ⚠️ CHANGED: 5 -> 2 ⚠️
     """Student/Staff fingerprint authentication with GUI"""
     print(f"\n🔒 Starting fingerprint authentication (Max attempts: {max_attempts})")
     
     from etc.ui.fingerprint_gui import FingerprintAuthGUI
     
     try:
-        auth_gui = FingerprintAuthGUI(max_attempts)
+        auth_gui = FingerprintAuthGUI(max_attempts)  # This passes 2 to the GUI
         auth_gui.root.wait_window()
         
         if auth_gui.auth_result is False:
@@ -42,7 +40,7 @@ def authenticate_fingerprint(max_attempts=5):
 
 def authenticate_fingerprint_with_time_tracking():
     """Authenticate fingerprint and auto handle time in/out"""
-    student_info = authenticate_fingerprint()
+    student_info = authenticate_fingerprint()  # Uses default of 2 attempts now
     
     if not student_info or student_info['student_id'] == 'N/A':
         return student_info

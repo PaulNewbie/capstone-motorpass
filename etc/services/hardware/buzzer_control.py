@@ -60,8 +60,34 @@ class BuzzerController:
                 self.simple_beep(0.15)
                 
             elif pattern_name == "failure":
-                # One longer beep
-                self.simple_beep(2)
+                # OLD: One longer beep - NOT DISTINCTIVE ENOUGH
+                # self.simple_beep(2)
+                
+                # NEW: SECURITY ALARM - Multiple rapid beeps to alert guards
+                # Pattern: 3 sets of rapid beeps with pauses
+                print("🚨 SECURITY ALARM: Authentication failed!")
+                
+                for alarm_cycle in range(2):  # 3 cycles
+                    # Rapid beeps (SOS-style)
+                    for beep in range(3):
+                        self.simple_beep(0.15)  # Short beep
+                        time.sleep(0.1)  # Quick gap
+                    
+                    # Longer beeps in middle of pattern
+                    for beep in range(2):
+                        self.simple_beep(0.3)  # Longer beep
+                        time.sleep(0.15)
+                    
+                    # Final rapid beeps
+                    for beep in range(3):
+                        self.simple_beep(0.15)
+                        time.sleep(0.1)
+                    
+                    # Pause between cycles (except last cycle)
+                    if alarm_cycle < 1:
+                        time.sleep(0.5)
+                
+                print("🚨 Alarm pattern complete")
                 
         except Exception as e:
             print(f"⚠️ Pattern error: {e}")
@@ -114,7 +140,7 @@ def play_success():
         buzzer_controller.play_pattern("success")
 
 def play_failure():
-    """Failure sound"""
+    """Failure/Security Alarm sound - NOW WITH ENHANCED ALARM PATTERN"""
     if ENABLE_BUZZER and buzzer_controller:
         buzzer_controller.play_pattern("failure")
 
@@ -134,24 +160,25 @@ def cleanup_buzzer():
 
 # Test function
 if __name__ == "__main__":
-    print("🔊 Simple Buzzer Test")
+    print("🔊 Enhanced Buzzer Test with Security Alarm")
     
     if init_buzzer():
         print("Testing sounds...")
         
-        print("1. Processing...")
+        print("\n1. Processing...")
         play_processing()
         time.sleep(2)
         
-        print("2. Success...")
+        print("\n2. Success...")
         play_success()
         time.sleep(2)
         
-        print("3. Failure...")
+        print("\n3. SECURITY ALARM (Enhanced Failure Pattern)...")
+        print("   Listen for the distinctive alarm pattern!")
         play_failure()
         time.sleep(2)
         
-        print("✅ Test complete!")
+        print("\n✅ Test complete!")
         cleanup_buzzer()
     else:
         print("❌ Buzzer test failed!")
