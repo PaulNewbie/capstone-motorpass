@@ -1,4 +1,4 @@
-# services/rpi_camera.py - Updated with Smart Cleanup Strategy
+# services/hardware/rpi_camera.py - Updated with Clean Camera Display
 
 import cv2
 import numpy as np
@@ -19,6 +19,146 @@ _camera_state = 'IDLE'  # IDLE, INITIALIZING, ACTIVE, CLEANING
 _last_cleanup_time = 0
 _cleanup_cooldown = 1.0  # Minimum seconds between cleanups
 
+# Global variables for clean camera display
+_cancel_clicked = False
+_button_rect_global = None
+_window_positions = {}  # Track window positions for centering
+
+
+# ============== CLEAN CAMERA DISPLAY FUNCTIONS ==============
+
+def create_clean_camera_window(window_name="Camera", width=640, height=480):
+    """
+    Create a clean camera window with no toolbar buttons
+    
+    Args:
+        window_name: Name of the window
+        width: Window width
+        height: Window height
+    """
+    # Use WINDOW_NORMAL for better compatibility and responsiveness
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    
+    # Set window size
+    cv2.resizeWindow(window_name, width, height)
+    
+    # Set window to always be on top (hides taskbar)
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
+    
+    # Center the window
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        root.destroy()
+        
+        x_pos = (screen_width - width) // 2
+        y_pos = (screen_height - height) // 2
+        cv2.moveWindow(window_name, x_pos, y_pos)
+    except:
+        pass  # If centering fails, just continue
+    
+    return width, height
+
+
+def restore_taskbar():
+    """
+    Helper function to restore taskbar visibility
+    Call this when you're done with the camera window
+    """
+    # Destroying all OpenCV windows will automatically restore taskbar
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+
+
+def add_cancel_button_overlay(frame, button_width=120, button_height=40, margin=20):
+    """
+    Add a clean cancel button overlay on the frame
+    
+    Args:
+        frame: The camera frame to add button to
+        button_width: Width of cancel button
+        button_height: Height of cancel button
+        margin: Margin from edges
+    
+    Returns:
+        frame: Frame with button overlay
+        button_rect: (x1, y1, x2, y2) coordinates of button for click detection
+    """
+    global _button_rect_global
+    
+    h, w = frame.shape[:2]
+    
+    # Position button at top-right
+    x1 = w - button_width - margin
+    y1 = margin
+    x2 = x1 + button_width
+    y2 = y1 + button_height
+    
+    # Draw semi-transparent background
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+    
+    # Draw red border
+    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+    
+    # Add "CANCEL" text
+    text = "CANCEL"
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.6
+    thickness = 2
+    text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+    
+    text_x = x1 + (button_width - text_size[0]) // 2
+    text_y = y1 + (button_height + text_size[1]) // 2
+    
+    cv2.putText(frame, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+    
+    _button_rect_global = (x1, y1, x2, y2)
+    return frame, _button_rect_global
+
+
+def check_cancel_click(x, y, button_rect):
+    """
+    Check if click coordinates are within cancel button
+    
+    Args:
+        x, y: Click coordinates
+        button_rect: (x1, y1, x2, y2) button rectangle
+    
+    Returns:
+        bool: True if clicked inside button
+    """
+    if button_rect is None:
+        return False
+    x1, y1, x2, y2 = button_rect
+    return x1 <= x <= x2 and y1 <= y <= y2
+
+
+def camera_mouse_callback(event, x, y, flags, param):
+    """Mouse callback to handle cancel button clicks"""
+    global _cancel_clicked, _button_rect_global
+    
+    if event == cv2.EVENT_LBUTTONDOWN and _button_rect_global:
+        if check_cancel_click(x, y, _button_rect_global):
+            _cancel_clicked = True
+            print("🛑 Cancel button clicked")
+
+
+def reset_cancel_state():
+    """Reset the cancel button state"""
+    global _cancel_clicked
+    _cancel_clicked = False
+
+
+def is_cancel_clicked():
+    """Check if cancel button was clicked"""
+    return _cancel_clicked
+
+
+# ============== CAMERA MANAGEMENT FUNCTIONS ==============
 
 def force_camera_cleanup():
     """Smart cleanup of camera resources - only cleans when necessary"""
@@ -75,6 +215,7 @@ def force_camera_cleanup():
     _last_cleanup_time = time.time()
     print("✅ Camera cleanup completed")
 
+
 def get_camera():
     """Get camera instance with state tracking"""
     global _camera_instance, _camera_state
@@ -99,9 +240,13 @@ def get_camera():
     
     return _camera_instance
 
+
 def release_camera():
     """Release camera instance"""
     force_camera_cleanup()
+
+
+# ============== RPi CAMERA SERVICE CLASS ==============
 
 class RPiCameraService:
     def __init__(self):
@@ -181,7 +326,9 @@ class RPiCameraService:
                 pass
         self.initialized = False
 
-# Context manager for safe camera operations with smart cleanup
+
+# ============== CONTEXT MANAGER ==============
+
 class CameraContext:
     """Context manager that guarantees smart camera cleanup"""
     def __enter__(self):
@@ -195,7 +342,9 @@ class CameraContext:
         force_camera_cleanup()
         return False
 
-# Helper to ensure cleanup
+
+# ============== HELPER FUNCTIONS ==============
+
 def ensure_camera_cleanup():
     """Wrapper for smart cleanup"""
     force_camera_cleanup()

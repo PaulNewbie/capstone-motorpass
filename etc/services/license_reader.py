@@ -13,7 +13,7 @@ import hashlib
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
-from etc.services.hardware.rpi_camera import get_camera
+from etc.services.hardware.rpi_camera import *
 from etc.services.hardware.led_control import set_led_white_lighting
 
 # ============== CONFIGURATION ==============
@@ -785,8 +785,10 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
     good_readings_count = 0
     green_start_time = None
     
-    cv2.namedWindow("MotorPass - License Capture", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("MotorPass - License Capture", SCREEN_WIDTH, SCREEN_HEIGHT)
+    window_name = "MotorPass - License Capture"
+    create_clean_camera_window(window_name, SCREEN_WIDTH, SCREEN_HEIGHT)
+    cv2.setMouseCallback(window_name, camera_mouse_callback)
+    reset_cancel_state()
     
     def _enhance_roi_only(roi, keyword_count):
         """Enhance only the ROI based on keyword detection"""
@@ -1061,7 +1063,12 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
                     text_y = (new_h + text_size[1]) // 2
                     cv2.putText(display_frame, countdown_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
             
-            cv2.imshow("MotorPass - License Capture", display_frame)
+            frame_with_button, _ = add_cancel_button_overlay(display_frame)
+            cv2.imshow(window_name, frame_with_button)
+
+            if is_cancel_clicked():
+                print("❌ License capture cancelled")
+                break
             
             key = cv2.waitKey(30) & 0xFF
             if key == ord("q"):

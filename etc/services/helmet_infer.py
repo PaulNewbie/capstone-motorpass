@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 import time
-from etc.services.hardware.rpi_camera import force_camera_cleanup, CameraContext
+from etc.services.hardware.rpi_camera import *
 from etc.services.hardware.led_control import update_led_progress, set_led_failed
 
 # === Helmet Detection Config ===
@@ -102,8 +102,10 @@ def verify_helmet():
             print("🔍 Helmet detection started... Please show your full-face helmet to the camera")
             
             # Create window
-            cv2.namedWindow("Helmet Verification", cv2.WINDOW_NORMAL)
-            cv2.resizeWindow("Helmet Verification", 800, 600)
+            window_name = "Helmet Verification"
+            target_width, target_height = create_clean_camera_window(window_name, 950, 750)
+            cv2.setMouseCallback(window_name, camera_mouse_callback)
+            reset_cancel_state()
             
             frame_count = 0
             last_frame_time = time.time()
@@ -120,7 +122,7 @@ def verify_helmet():
                     error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
                     cv2.putText(error_frame, "Camera Connection Failed", (150, 240),
                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    cv2.imshow("Helmet Verification", error_frame)
+                    cv2.imshow(window_name, error_frame)  # ← Changed to window_name
                     
                     key = cv2.waitKey(1000) & 0xFF
                     if key == ord('q') or key == 27:
@@ -197,8 +199,13 @@ def verify_helmet():
                     cv2.putText(frame, status_text, (10, 40),
                                cv2.FONT_HERSHEY_SIMPLEX, 1, status_color, 2)
                 
-                # Show frame
-                cv2.imshow("Helmet Verification", frame)
+                
+                frame_with_button, _ = add_cancel_button_overlay(frame)
+                cv2.imshow(window_name, frame_with_button)
+
+                if is_cancel_clicked():
+                    print("❌ Helmet verification cancelled by user")
+                    break
                 
                 # Check for user input
                 key = cv2.waitKey(30) & 0xFF
