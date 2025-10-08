@@ -190,9 +190,12 @@ def run_verification_with_gui(status_callback):
                     'current_step': f'❌ License expired ({abs(days_left)} days overdue)'
                 })
                 
+                from database.db_operations import log_expired_license_attempt
+                log_expired_license_attempt(user_info, days_left)
+                
                 result_data = {'verified': False, 'reason': 'License has expired'}
                 execute_failure_feedback_concurrent(status_callback, result_data)
-                time.sleep(3.0)
+                time.sleep(5.0)
                 
                 cleanup_buzzer()
                 set_led_idle()

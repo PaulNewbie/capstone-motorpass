@@ -88,6 +88,21 @@ def initialize_all_databases():
             )
         ''')
         
+        # ===== EXPIRED LICENSE TABLE =====
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS expired_license_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                user_type TEXT NOT NULL,
+                license_expiration TEXT NOT NULL,
+                transaction_date TEXT NOT NULL,
+                transaction_time TEXT NOT NULL,
+                days_overdue INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # ===== CURRENT STATUS TABLE =====
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS current_status (
@@ -108,6 +123,10 @@ def initialize_all_databases():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_time_tracking_user ON time_tracking(user_id, user_type)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_time_tracking_date ON time_tracking(date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_current_status_type ON current_status(user_type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_current_status_type ON current_status(user_id, user_name')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_expired_license_date ON expired_license_attempts(transaction_date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_expired_license_user ON expired_license_attempts(user_id)')
+
         
         conn.commit()
         conn.close()
@@ -160,8 +179,6 @@ def verify_database_integrity() -> bool:
 def create_office_management_table():
     """Create office management table with security codes"""
     try:
-        import sqlite3
-        from database.init_database import MOTORPASS_DB
         
         conn = sqlite3.connect(MOTORPASS_DB)
         cursor = conn.cursor()
@@ -284,3 +301,28 @@ def get_database_stats() -> Dict:
     except Exception as e:
         print(f"❌ Backup error: {e}")
         return False
+        
+# =================== FOR EXPIRED LICENSE ===================
+        
+def create_expired_license_table(conn):
+    """Create table for tracking expired license attempts"""
+    
+    conn = sqlite3.connect(MOTORPASS_DB)
+
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS expired_license_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            user_type TEXT NOT NULL,
+            license_expiration TEXT NOT NULL,
+            transaction_date TEXT NOT NULL,
+            transaction_time TEXT NOT NULL,
+            days_overdue INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    print("✅ expired_license_attempts table created")

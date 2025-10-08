@@ -816,6 +816,107 @@ def check_firebase_status_in_motorpass():
     except Exception as e:
         print(f"⚠️  Error checking Firebase: {e}")
         return None
+        
+# =================== FOR EXPIRED LICENSE ===================
+
+def log_expired_license_attempt(user_info: Dict, days_overdue: int) -> bool:
+    """Log when someone with expired license tries to time in"""
+    try:
+        from datetime import datetime
+        
+        conn = sqlite3.connect(MOTORPASS_DB)
+        cursor = conn.cursor()
+        
+        now = datetime.now()
+        transaction_date = now.strftime('%Y-%m-%d')
+        transaction_time = now.strftime('%H:%M:%S')
+        
+        # Determine user_id based on user type
+        if user_info.get('user_type') == 'STUDENT':
+            user_id = user_info.get('student_id', 'N/A')
+        elif user_info.get('user_type') == 'STAFF':
+            user_id = user_info.get('staff_no', 'N/A')
+        else:
+            user_id = 'N/A'
+        
+        cursor.execute('''
+            INSERT INTO expired_license_attempts 
+            (full_name, user_id, user_type, license_expiration, 
+             transaction_date, transaction_time, days_overdue)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            user_info.get('name', user_info.get('full_name', 'Unknown')),
+            user_id,
+            user_info.get('user_type', 'UNKNOWN'),
+            user_info.get('license_expiration', 'N/A'),
+            transaction_date,
+            transaction_time,
+            abs(days_overdue)
+        ))
+        
+        conn.commit()
+        attempt_id = cursor.lastrowid
+        conn.close()
+        
+        print(f"📝 Logged expired license attempt: {user_info.get('name', 'Unknown')} ({abs(days_overdue)} days overdue)")
+        
+        # Sync to Firebase
+        try:
+            from etc.utils.firebase_helper import sync_expired_license_to_firebase
+            sync_expired_license_to_firebase(
+                attempt_id=attempt_id,
+                full_name=user_info.get('name', user_info.get('full_name', 'Unknown')),
+                user_id=user_id,
+                user_type=user_info.get('user_type', 'UNKNOWN'),
+                license_expiration=user_info.get('license_expiration', 'N/A'),
+                transaction_date=transaction_date,
+                transaction_time=transaction_time,
+                days_overdue=abs(days_overdue)
+            )
+        except Exception as e:
+            print(f"⚠️ Firebase sync failed (saved locally): {e}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error logging expired license attempt: {e}")
+        return False
+
+
+def get_expired_license_attempts(limit: int = 100) -> List[Dict]:
+    """Get recent expired license attempts"""
+    try:
+        conn = sqlite3.connect(MOTORPASS_DB)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, full_name, user_id, user_type, license_expiration,
+                   transaction_date, transaction_time, days_overdue, created_at
+            FROM expired_license_attempts
+            ORDER BY created_at DESC
+            LIMIT ?
+        ''', (limit,))
+        
+        attempts = []
+        for row in cursor.fetchall():
+            attempts.append({
+                'id': row[0],
+                'full_name': row[1],
+                'user_id': row[2],
+                'user_type': row[3],
+                'license_expiration': row[4],
+                'transaction_date': row[5],
+                'transaction_time': row[6],
+                'days_overdue': row[7],
+                'created_at': row[8]
+            })
+        
+        conn.close()
+        return attempts
+        
+    except Exception as e:
+        print(f"❌ Error fetching expired license attempts: {e}")
+        return []
 
 # =================== UNIFIED USER LOOKUP ===================
 

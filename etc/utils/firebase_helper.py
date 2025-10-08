@@ -3,6 +3,35 @@
 import os
 import sys
 
+def sync_expired_license_to_firebase(attempt_id, full_name, user_id, user_type, 
+                                     license_expiration, transaction_date, 
+                                     transaction_time, days_overdue):
+    """Sync expired license attempt to Firebase"""
+    try:
+        from etc.firebase.sync import is_online, firebase_db, firestore
+        
+        if not is_online():
+            print(f"📴 Offline - Expired license attempt will sync when online")
+            return
+        
+        attempt_data = {
+            'id': attempt_id,
+            'full_name': full_name,
+            'user_id': user_id,
+            'user_type': user_type,
+            'license_expiration': license_expiration,
+            'transaction_date': transaction_date,
+            'transaction_time': transaction_time,
+            'days_overdue': days_overdue,
+            'synced_at': firestore.SERVER_TIMESTAMP
+        }
+        
+        firebase_db.collection('expired_license_attempts').document(str(attempt_id)).set(attempt_data)
+        print(f"🔥 Expired license attempt synced to Firebase: {full_name}")
+        
+    except Exception as e:
+        print(f"⚠️ Firebase sync failed: {e}")
+
 def safe_firebase_sync(sync_function, *args, **kwargs):
     """Safely call Firebase sync functions with error handling"""
     try:
