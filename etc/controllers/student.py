@@ -1,4 +1,4 @@
-# etc/controllers/student.py - REFACTORED & CLEANED
+# etc/controllers/student.py 
 """
 Student/Staff Verification Controller 
 """

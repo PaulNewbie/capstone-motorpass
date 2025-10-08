@@ -58,3 +58,41 @@ MSG_LICENSE_ATTEMPT = "📷 License attempt {attempt}/2"
 # ============= SEPARATORS =============
 SEPARATOR_LONG = "=" * 60
 SEPARATOR_SHORT = "=" * 30
+
+
+
+# ==========================
+# GUEST-SPECIFIC MESSAGES
+# ==========================
+
+# Guest Registration
+MSG_GUEST_NEW_REGISTRATION = "New guest - Opening registration form..."
+MSG_GUEST_CANCELLED = "Guest registration cancelled"
+MSG_GUEST_INFO_REQUIRED = "Please provide guest information..."
+
+# Guest Status
+MSG_GUEST_ALREADY_IN = "Guest already IN - Processing automatic TIMEOUT"
+MSG_GUEST_TIMEOUT_SECURITY = "Security verification required for timeout..."
+MSG_GUEST_TIMEOUT_SUCCESS = "Guest timeout successful"
+MSG_GUEST_TIMEOUT_FAILED = "Failed to record guest timeout"
+
+# Guest Detection
+MSG_GUEST_STUDENT_STAFF_DETECTED = "Student/Staff NOT allowed as visitors"
+MSG_GUEST_NAME_DETECTED = "Detected guest name: {name}"
+
+# Guest Time Recording
+MSG_GUEST_TIME_IN_PROCESSING = "Processing guest time in..."
+MSG_GUEST_TIME_IN_SUCCESS = "Guest TIME IN recorded successfully"
+MSG_GUEST_TIME_IN_FAILED = "Failed to record guest TIME IN"
+MSG_GUEST_TIME_OUT_PROCESSING = "Recording guest TIME OUT..."
+MSG_GUEST_TIME_OUT_SUCCESS = "Guest TIME OUT recorded successfully"
+MSG_GUEST_TIME_OUT_FAILED = "Failed to record guest TIME OUT"
+
+# Guest Verification
+MSG_GUEST_VERIFICATION_SUCCESS = "Guest verification successful"
+MSG_GUEST_VERIFICATION_FAILED = "Guest verification failed"
+MSG_GUEST_LICENSE_RETAKE = "Retaking license scan..."
+
+# Firebase Sync (Guest)
+MSG_GUEST_FIREBASE_SYNCED = "Guest synced to Firebase"
+MSG_GUEST_FIREBASE_FAILED = "Firebase sync failed"
