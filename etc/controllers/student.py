@@ -15,6 +15,11 @@ from etc.services.license_reader import (
     auto_capture_license_rpi
 )
 
+from etc.utils.led_helpers import *
+
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
 # Import database operations
 from database.db_operations import (
     get_student_time_status,
@@ -70,10 +75,13 @@ def run_verification_with_gui(status_callback):
         if not verify_helmet():
             status_callback({'helmet_status': 'FAILED'})
             status_callback({'current_step': '❌ Helmet verification failed'})
-            set_led_idle()
-            play_failure()
-            set_led_failed_fast_blink()
+            
+            result_data = {'verified': False, 'reason': 'Helmet verification failed'}
+            execute_failure_feedback_concurrent(status_callback, result_data)
+            time.sleep(3.0)
+            
             cleanup_buzzer()
+            set_led_idle()
             return {'verified': False, 'reason': 'Helmet verification failed'}
         
         status_callback({'helmet_status': 'VERIFIED'})
@@ -89,10 +97,13 @@ def run_verification_with_gui(status_callback):
         if not user_info:
             status_callback({'fingerprint_status': 'FAILED'})
             status_callback({'current_step': '❌ Fingerprint authentication failed - Access Denied'})
-            set_led_idle()
-            play_failure()
-            set_led_failed_fast_blink()
+            
+            result_data = {'verified': False, 'reason': 'Fingerprint authentication failed after 2 attempts'}
+            execute_failure_feedback_concurrent(status_callback, result_data)
+            time.sleep(3.0)
+            
             cleanup_buzzer()
+            set_led_idle()
             return {'verified': False, 'reason': 'Fingerprint authentication failed after 2 attempts'}
         
         status_callback({'fingerprint_status': 'VERIFIED'})
@@ -135,9 +146,12 @@ def run_verification_with_gui(status_callback):
                 }
             else:
                 status_callback({'current_step': '❌ Failed to record TIME OUT'})
+                
+                result_data = {'verified': False, 'reason': 'Failed to record TIME OUT'}
+                execute_failure_feedback_concurrent(status_callback, result_data)
+                time.sleep(3.0)
+                
                 set_led_idle()
-                play_failure()
-                set_led_failed_fast_blink()
                 result = {'verified': False, 'reason': 'Failed to record TIME OUT'}
                 
         else:
@@ -175,10 +189,13 @@ def run_verification_with_gui(status_callback):
                     'license_status': 'EXPIRED',
                     'current_step': f'❌ License expired ({abs(days_left)} days overdue)'
                 })
-                set_led_idle()
-                play_failure()
-                set_led_failed_fast_blink()
+                
+                result_data = {'verified': False, 'reason': 'License has expired'}
+                execute_failure_feedback_concurrent(status_callback, result_data)
+                time.sleep(3.0)
+                
                 cleanup_buzzer()
+                set_led_idle()
                 return {'verified': False, 'reason': 'License has expired'}
 
             
@@ -221,9 +238,12 @@ def run_verification_with_gui(status_callback):
                     # Camera capture failed - likely Student Permit detected in preview
                     print("❌ Student Driver License likely detected in camera preview")
                     status_callback({'current_step': '❌ Student Driver License not allowed - Access denied'})
+                    
+                    result_data = {'verified': False, 'reason': 'Student Driver License not allowed'}
+                    execute_failure_feedback_concurrent(status_callback, result_data)
+                    time.sleep(3.0)
+                    
                     set_led_idle()
-                    play_failure()
-                    set_led_failed_fast_blink()
                     return {'verified': False, 'reason': 'Student Driver License not allowed'}
                 
                 try:
@@ -363,14 +383,21 @@ def run_verification_with_gui(status_callback):
                                 license_success = True
                                 break
                             else:
+                                result_data = {'verified': False, 'reason': 'Manual override failed'}
+                                execute_failure_feedback_concurrent(status_callback, result_data)
+                                time.sleep(3.0)
+                                set_led_idle()
                                 return {'verified': False, 'reason': 'Manual override failed'}
                 
                 except ValueError as e:
                     if "STUDENT_PERMIT_DETECTED" in str(e):
                         status_callback({'current_step': '❌ Student Permit detected - Access denied'})
+                        
+                        result_data = {'verified': False, 'reason': 'Student Permit not allowed'}
+                        execute_failure_feedback_concurrent(status_callback, result_data)
+                        time.sleep(3.0)
+                        
                         set_led_idle()
-                        play_failure()
-                        set_led_failed_fast_blink()
                         # Clean up and return failure
                         if current_image_path and os.path.exists(current_image_path):
                             try:
@@ -402,9 +429,12 @@ def run_verification_with_gui(status_callback):
                         result = final_result
                     else:
                         status_callback({'current_step': '❌ Failed to record TIME IN'})
+                        
+                        result_data = {'verified': False, 'reason': 'Failed to record TIME IN'}
+                        execute_failure_feedback_concurrent(status_callback, result_data)
+                        time.sleep(3.0)
+                        
                         set_led_idle()
-                        play_failure()
-                        set_led_failed_fast_blink()
                         result = {'verified': False, 'reason': 'Failed to record TIME IN'}
                 else:
                     # Standard verification success
@@ -431,13 +461,20 @@ def run_verification_with_gui(status_callback):
                         }
                     else:
                         status_callback({'current_step': '❌ Failed to record TIME IN'})
+                        
+                        result_data = {'verified': False, 'reason': 'Failed to record TIME IN'}
+                        execute_failure_feedback_concurrent(status_callback, result_data)
+                        time.sleep(3.0)
+                        
                         set_led_idle()
-                        play_failure()
-                        set_led_failed_fast_blink()
                         result = {'verified': False, 'reason': 'Failed to record TIME IN'}
 
             # If we reach here, verification completely failed
             if not result.get('verified', False):
+                result_data = {'verified': False, 'reason': 'License verification failed'}
+                execute_failure_feedback_concurrent(status_callback, result_data)
+                time.sleep(3.0)
+                set_led_idle()
                 result = {'verified': False, 'reason': 'License verification failed'}
     
     finally:

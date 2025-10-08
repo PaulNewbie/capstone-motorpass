@@ -11,6 +11,11 @@ from etc.utils.timeout_security import timeout_security_verification
 import difflib
 import time
 
+from etc.utils.led_helpers import *
+
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
 # FIXED: Import Firebase helper instead of direct import
 from etc.utils.firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
 
@@ -57,10 +62,13 @@ def run_guest_verification_with_gui(status_callback):
         if not verify_helmet():
             status_callback({'helmet_status': 'FAILED'})
             status_callback({'current_step': '❌ Helmet verification failed'})
-            set_led_idle()
-            play_failure()
-            set_led_failed_fast_blink()
+            
+            result_data = {'verified': False, 'reason': 'Helmet verification failed'}
+            execute_failure_feedback_concurrent(status_callback, result_data)
+            time.sleep(3.0)
+            
             cleanup_buzzer()
+            set_led_idle()
             return {'verified': False, 'reason': 'Helmet verification failed'}
         
         status_callback({'helmet_status': 'VERIFIED'})
@@ -82,9 +90,11 @@ def run_guest_verification_with_gui(status_callback):
             if not image_path:
                 status_callback({'license_status': 'FAILED'})
                 status_callback({'current_step': '❌ License capture failed'})
+                
+                result_data = {'verified': False, 'reason': 'License capture failed'}
+                execute_failure_feedback_concurrent(status_callback, result_data)
+                time.sleep(3.0)
                 set_led_idle()
-                play_failure()
-                set_led_failed_fast_blink()
                 cleanup_buzzer()
                 return {'verified': False, 'reason': 'License capture failed'}
             
@@ -101,10 +111,12 @@ def run_guest_verification_with_gui(status_callback):
                     print("❌ Student Permit detected - Access denied")
                     status_callback({'current_step': '❌ Student Permit not allowed - Access denied'})
                     safe_delete_temp_file(image_path)
-                    set_led_idle()
-                    play_failure()
-                    set_led_failed_fast_blink()
+        
+                    result_data = {'verified': False, 'reason': 'Student Permit not allowed'}
+                    execute_failure_feedback_concurrent(status_callback, result_data)
+                    time.sleep(3.0)
                     cleanup_buzzer()
+                    set_led_idle()
                     return {'verified': False, 'reason': 'Student Permit not allowed'}
                 else:
                     raise e
@@ -122,9 +134,11 @@ def run_guest_verification_with_gui(status_callback):
                 print(f"   Match found: {match_info}")
                 status_callback({'current_step': f'❌ Student/Staff NOT allowed as visitors - {match_info}'})
                 safe_delete_temp_file(image_path)
+                
+                result_data = {'verified': False, 'reason': f'Student/Staff not allowed as visitors - {match_info}'}
+                execute_failure_feedback_concurrent(status_callback, result_data)
+                time.sleep(3.0)
                 set_led_idle()
-                play_failure()
-                set_led_failed_fast_blink()
                 cleanup_buzzer()
                 return {'verified': False, 'reason': f'Student/Staff not allowed as visitors - {match_info}'}
             
@@ -183,10 +197,12 @@ def run_guest_verification_with_gui(status_callback):
                         }
                     else:
                         status_callback({'current_step': '❌ Failed to record TIME OUT'})
-                        set_led_idle()
-                        play_failure()
-                        set_led_failed_fast_blink()
+                        
+                        result_data = {'verified': False, 'reason': 'Failed to record TIME OUT'}
+                        execute_failure_feedback_concurrent(status_callback, result_data)
+                        time.sleep(3.0)
                         cleanup_buzzer()
+                        set_led_idle()
                         safe_delete_temp_file(image_path)
                         return {'verified': False, 'reason': 'Failed to record TIME OUT'}
                 
@@ -195,9 +211,11 @@ def run_guest_verification_with_gui(status_callback):
                     print("❌ Security verification failed or cancelled")
                     status_callback({'current_step': '❌ Security verification failed - Timeout DENIED'})
                     safe_delete_temp_file(image_path)
+                    
+                    result_data = {'verified': False, 'reason': 'Security verification failed'}
+                    execute_failure_feedback_concurrent(status_callback, result_data)
+                    time.sleep(3.0)
                     set_led_idle()
-                    play_failure()
-                    set_led_failed_fast_blink()
                     cleanup_buzzer()
                     return {'verified': False, 'reason': 'Security verification failed'}
             
@@ -227,9 +245,11 @@ def run_guest_verification_with_gui(status_callback):
                     # User cancelled
                     status_callback({'current_step': '❌ Guest registration cancelled'})
                     safe_delete_temp_file(image_path)
+                    
+                    result_data = {'verified': False, 'reason': 'Guest registration cancelled'}
+                    execute_failure_feedback_concurrent(status_callback, result_data)
+                    time.sleep(3.0)
                     set_led_idle()
-                    play_failure()
-                    set_led_failed_fast_blink()
                     cleanup_buzzer()
                     return {'verified': False, 'reason': 'Guest registration cancelled'}
                 
@@ -263,9 +283,11 @@ def run_guest_verification_with_gui(status_callback):
                 except ValueError as e:
                     if "STUDENT_PERMIT_DETECTED" in str(e):
                         status_callback({'current_step': '❌ Student Permit detected - Access denied'})
+                        
+                        result_data = {'verified': False, 'reason': 'Student Permit not allowed'}
+                        execute_failure_feedback_concurrent(status_callback, result_data)
+                        time.sleep(3.0)
                         set_led_idle()
-                        play_failure()
-                        set_led_failed_fast_blink()
                         cleanup_buzzer()
                         safe_delete_temp_file(image_path)
                         return {'verified': False, 'reason': 'Student Permit not allowed'}
@@ -301,26 +323,32 @@ def run_guest_verification_with_gui(status_callback):
                         }
                     else:
                         status_callback({'current_step': '❌ Failed to record TIME IN'})
+                        
+                        result_data = {'verified': False, 'reason': 'Failed to record TIME IN'}
+                        execute_failure_feedback_concurrent(status_callback, result_data)
+                        time.sleep(3.0)
                         set_led_idle()
-                        play_failure()
-                        set_led_failed_fast_blink()
                         cleanup_buzzer()
                         safe_delete_temp_file(image_path)
                         return {'verified': False, 'reason': 'Failed to record TIME IN'}
                 else:
                     status_callback({'current_step': '❌ Guest verification failed'})
+                    
+                    result_data = {'verified': False, 'reason': 'License verification failed'}
+                    execute_failure_feedback_concurrent(status_callback, result_data)
+                    time.sleep(3.0)
                     set_led_idle()
-                    play_failure()
-                    set_led_failed_fast_blink()
                     cleanup_buzzer()
                     safe_delete_temp_file(image_path)
                     return {'verified': False, 'reason': 'License verification failed'}
         
     except Exception as e:
         print(f"❌ Error during verification: {e}")
+        
+        result_data = {'verified': False, 'reason': str(e)}
+        execute_failure_feedback_concurrent(status_callback, result_data)
+        time.sleep(3.0)
         set_led_idle()
-        play_failure()
-        set_led_failed_fast_blink()
         cleanup_buzzer()
         return {'verified': False, 'reason': str(e)}
         
