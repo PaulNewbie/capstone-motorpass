@@ -752,10 +752,19 @@ def package_name_info(structured_data: Dict[str, str], basic_text: str, fingerpr
 # ============== CAMERA FUNCTIONS ==============
 
 def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optional[dict] = None, retry_mode: bool = False) -> Optional[str]:
-    """Auto-capture license using RPi Camera with ROI-only enhancement and stability tracking"""
+    """
+    Auto-capture license using RPi Camera with ROI-only enhancement and stability tracking
+    
+    Returns:
+        tuple: (image_path, reason) where reason is:
+            - "success": Capture successful
+            - "cancelled": User cancelled (pressed 'q' or cancel button)
+            - "student_permit": Student permit detected in preview
+            - "camera_error": Camera initialization failed
+    """
     camera = get_camera()
     if not camera.initialized:
-        return None
+        return (None, "camera_error")
         
     set_led_white_lighting()
      
@@ -884,7 +893,7 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
                             print("❌ Student Permit detected in camera preview - Stopping capture")
                             cv2.destroyAllWindows()
                             safe_delete_temp_file(temp_filename)
-                            return None
+                            return (None, "student_permit") 
                         
                         current_keywords = sum(1 for keyword in VERIFICATION_KEYWORDS if keyword in quick_text)
                         
@@ -1072,6 +1081,7 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
             
             key = cv2.waitKey(30) & 0xFF
             if key == ord("q"):
+                print("\n🛑 License capture cancelled by user") 
                 break
             elif key == ord("s"):
                 # Manual capture with current enhancement level
@@ -1086,15 +1096,15 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
         if captured_frame is not None:
             optimized_frame = _resize_image_optimal(captured_frame)
             cv2.imwrite(temp_filename, optimized_frame)
-            return temp_filename
+            return (temp_filename, "success")
         else:
             safe_delete_temp_file(temp_filename)
-            return None
+            return (None, "cancelled")
             
     except Exception:
         cv2.destroyAllWindows()
         safe_delete_temp_file(temp_filename)
-        return None
+        return (None, "camera_error")
 
 # ============== VERIFICATION FUNCTIONS ==============
 
