@@ -1,4 +1,4 @@
-# controllers/guest.py - REFACTORED with clean helper functions
+# controllers/guest.py - FINAL FIXED: Cancel + Manual name + Correct function calls
 
 from etc.services.license_reader import *
 from etc.services.helmet_infer import verify_helmet
@@ -115,13 +115,30 @@ def _license_capture_and_processing_loop(status_callback):
     Handles both new guest registration and automatic timeout.
     """
     while True:
-        # Capture license
-        image_path = _capture_license_step(status_callback)
+        # Capture license - NOW WITH CANCEL DETECTION
+        capture_result = _capture_license_step(status_callback)
+        
+        # FIX 1: Handle tuple return for cancellation
+        if isinstance(capture_result, tuple):
+            image_path, reason = capture_result
+        else:
+            image_path = capture_result
+            reason = "success" if capture_result else "unknown"
+        
+        # Check if user cancelled
         if not image_path:
-            return handle_verification_failure(
-                status_callback, 
-                'License capture failed'
-            )
+            if reason == "cancelled":
+                log_warning("User cancelled license capture")
+                status_callback({'current_step': '❌ License capture cancelled'})
+                return handle_verification_failure(
+                    status_callback,
+                    'License capture cancelled by user'
+                )
+            else:
+                return handle_verification_failure(
+                    status_callback, 
+                    'License capture failed'
+                )
         
         status_callback({'license_status': 'DETECTED'})
         
@@ -166,7 +183,7 @@ def _license_capture_and_processing_loop(status_callback):
 
 
 def _capture_license_step(status_callback):
-    """Step 2a: Capture license"""
+    """Step 2a: Capture license with cancel detection"""
     status_callback({'current_step': '📄 Capturing license... (Check terminal for camera)'})
     status_callback({'license_status': 'PROCESSING'})
     
@@ -174,14 +191,34 @@ def _capture_license_step(status_callback):
     print(MSG_LICENSE_TERMINAL)
     print(SEPARATOR_LONG)
     
-    image_path = auto_capture_license_rpi()
+    # FIX 1: Capture returns tuple (image_path, reason)
+    capture_result = auto_capture_license_rpi()
     
-    if not image_path:
-        status_callback({'license_status': 'FAILED'})
-        status_callback({'current_step': MSG_LICENSE_VERIFICATION_FAILED})
-        log_error("License capture failed")
-    
-    return image_path
+    # Handle tuple return
+    if isinstance(capture_result, tuple):
+        image_path, reason = capture_result
+        
+        if not image_path and reason == "cancelled":
+            status_callback({'license_status': 'CANCELLED'})
+            status_callback({'current_step': '❌ License capture cancelled'})
+            log_warning("License capture cancelled by user")
+            return None, "cancelled"
+        elif not image_path:
+            status_callback({'license_status': 'FAILED'})
+            status_callback({'current_step': MSG_LICENSE_VERIFICATION_FAILED})
+            log_error("License capture failed")
+            return None, reason
+        
+        return image_path, "success"
+    else:
+        # Old format compatibility
+        image_path = capture_result
+        if not image_path:
+            status_callback({'license_status': 'FAILED'})
+            status_callback({'current_step': MSG_LICENSE_VERIFICATION_FAILED})
+            log_error("License capture failed")
+        
+        return image_path
 
 
 def _check_student_permit(image_path, status_callback):
@@ -218,26 +255,31 @@ def _check_if_student_or_staff(detected_name, image_path, status_callback):
     
     return False
 
-
 def _handle_automatic_timeout(detected_name, guest_info, image_path, status_callback):
     """Handle automatic timeout for guest already in system"""
     log_info(f"Guest '{detected_name}' already IN - Processing automatic TIMEOUT")
     
+    # Extract guest information
+    guest_name = guest_info.get('name', detected_name)
+    guest_plate = guest_info.get('plate_number', 'N/A')
+    guest_office = guest_info.get('office', 'N/A')
+    
     status_callback({
         'guest_info': {
-            'name': guest_info['name'],
-            'plate_number': guest_info.get('plate_number', 'N/A'),
-            'office': guest_info.get('office', 'N/A'),
+            'name': guest_name,
+            'plate_number': guest_plate,
+            'office': guest_office,
             'status': 'AUTOMATIC TIMEOUT'
         }
     })
     
     status_callback({'current_step': '🔒 Security verification required for timeout...'})
     
-    # Security verification
-    security_result = timeout_security_verification(guest_info['name'])
+    # FIX: Pass the whole guest_info dict, not just the name
+    security_result = timeout_security_verification(guest_info)
     
-    if security_result and security_result.get('verified'):
+    # FIX: security_result is a boolean (True/False), not a dict
+    if security_result:
         log_success("Security verification passed - Processing TIMEOUT")
         return _process_guest_timeout(guest_info, image_path, status_callback)
     else:
@@ -273,12 +315,18 @@ def _process_guest_timeout(guest_info, image_path, status_callback):
         cleanup_buzzer()
         cleanup_image_file(image_path)
         
-        return build_standard_success_result(
-            name=guest_info['name'],
-            time_action='OUT',
-            timestamp=timestamp,
-            extra_data={'guest_number': guest_info['guest_number']}
-        )
+        # FIX: Return complete guest information in success result
+        return {
+            'verified': True,
+            'name': guest_info.get('name', 'Guest'),
+            'student_id': guest_info.get('guest_number', guest_info.get('plate_number', 'N/A')),
+            'user_type': 'GUEST',
+            'time_action': 'OUT',
+            'timestamp': timestamp,
+            'plate_number': guest_info.get('plate_number', 'N/A'),
+            'office': guest_info.get('office', 'N/A'),
+            'guest_number': guest_info.get('guest_number', 'N/A')
+        }
     else:
         status_callback({'current_step': '❌ Failed to record TIME OUT'})
         cleanup_image_file(image_path)
@@ -286,8 +334,7 @@ def _process_guest_timeout(guest_info, image_path, status_callback):
             status_callback,
             'Failed to record TIME OUT'
         )
-
-
+        
 def _handle_new_guest_registration(detected_name, image_path, status_callback):
     """Handle registration flow for new guests"""
     status_callback({
@@ -319,9 +366,10 @@ def _handle_new_guest_registration(detected_name, image_path, status_callback):
                 'Guest registration cancelled'
             )
         
-        # Valid guest info provided
+        # FIX 2: Use manual input name, NOT detected name!
+        # The manual input is the authoritative source
         return _process_new_guest_time_in(
-            guest_info_input, 
+            guest_info_input,  # This contains the manually entered name
             image_path, 
             status_callback
         )
@@ -329,9 +377,12 @@ def _handle_new_guest_registration(detected_name, image_path, status_callback):
 
 def _process_new_guest_time_in(guest_info_input, image_path, status_callback):
     """Process time in for new guest"""
+    # FIX 2: Use the manually entered name from guest_info_input
+    manual_name = guest_info_input['name']
+    
     status_callback({
         'guest_info': {
-            'name': guest_info_input['name'],
+            'name': manual_name,  # Use manual input name
             'plate_number': guest_info_input['plate_number'],
             'office': guest_info_input['office'],
             'status': 'NEW GUEST - PROCESSING'
@@ -340,15 +391,17 @@ def _process_new_guest_time_in(guest_info_input, image_path, status_callback):
     
     status_callback({'current_step': '🔍 Processing guest time in...'})
     
-    # Prepare guest data for license verification
+    # FIX 2: Use manual name for verification, not detected name
     guest_data_for_license = {
-        'name': guest_info_input['name'],
+        'name': manual_name,  # Use manual input name
         'plate_number': guest_info_input['plate_number'],
         'office': guest_info_input['office'],
         'is_guest': True
     }
     
-    # Verify license
+    log_info(f"Using manually entered name: {manual_name}")
+    
+    # Verify license with MANUAL NAME (not detected name)
     try:
         is_guest_verified = complete_guest_verification_flow(
             image_path=image_path,
@@ -363,9 +416,9 @@ def _process_new_guest_time_in(guest_info_input, image_path, status_callback):
         raise e
     
     if is_guest_verified:
-        # Store guest and process time in
-        store_guest_in_database(guest_info_input)
-        time_result = process_guest_time_in(guest_info_input)
+        # Store guest and process time in - using MANUAL NAME
+        store_guest_in_database(guest_info_input)  # Already has manual name
+        time_result = process_guest_time_in(guest_info_input)  # Already has manual name
         
         if time_result['success']:
             timestamp = time.strftime('%H:%M:%S')
@@ -384,12 +437,14 @@ def _process_new_guest_time_in(guest_info_input, image_path, status_callback):
             cleanup_buzzer()
             cleanup_image_file(image_path)
             
-            return build_standard_success_result(
-                name=guest_info_input['name'],
-                time_action='IN',
-                timestamp=timestamp,
-                extra_data={'office': guest_info_input['office']}
-            )
+            # FIX 3: Create user_info dict for build_standard_success_result
+            guest_user_info = {
+                'name': manual_name,
+                'student_id': guest_info_input.get('plate_number', 'N/A'),
+                'user_type': 'GUEST'
+            }
+            
+            return build_standard_success_result(guest_user_info, timestamp, 'IN')
         else:
             status_callback({'current_step': '❌ Failed to record TIME IN'})
             cleanup_image_file(image_path)
@@ -491,4 +546,3 @@ def store_guest_in_database(guest_info):
     except Exception as e:
         log_error(f"Error storing guest in database: {e}")
         return False
-

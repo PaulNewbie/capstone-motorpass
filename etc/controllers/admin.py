@@ -49,7 +49,7 @@ def enroll_admin_fingerprint():
 # ENROLL Button
 def admin_enroll():
     """Enroll new user (student or staff) with GUI"""
-    from etc.ui.enrollment_fingerprint_gui import EnrollmentFingerprintGUI
+    from etc.ui.fingerprint_gui import EnrollmentFingerprintGUI
     import threading
     
     if finger.read_templates() != adafruit_fingerprint.OK:
