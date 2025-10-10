@@ -68,21 +68,15 @@ def run_guest_verification_with_gui(status_callback):
     set_led_processing()
     play_processing()
     
-    try:
-        # Step 1: Helmet verification
-        if not _verify_helmet_step(status_callback):
-            return handle_verification_failure(
-                status_callback, 
-                'Helmet verification failed'
-            )
-        
-        # Step 2: License capture and processing loop
-        return _license_capture_and_processing_loop(status_callback)
-        
-    except Exception as e:
-        log_error(f"Error during verification: {e}")
-        return handle_verification_failure(status_callback, str(e))
-
+    # Step 1: Helmet verification
+    if not _verify_helmet_step(status_callback):
+        return handle_verification_failure(
+            status_callback, 
+            'Helmet verification failed'
+        )
+    
+    # Step 2: License capture and processing loop
+    return _license_capture_and_processing_loop(status_callback)
 
 # ============================================================================
 #                          STEP FUNCTIONS
@@ -355,7 +349,7 @@ def _handle_new_guest_registration(detected_name, image_path, status_callback):
             status_callback({'current_step': '📄 Retaking license scan...'})
             cleanup_image_file(image_path)
             # Return to license capture
-            return run_guest_verification_with_gui(status_callback)
+            return _license_capture_and_processing_loop(status_callback)
         
         elif not guest_info_input:
             # User cancelled
@@ -366,7 +360,6 @@ def _handle_new_guest_registration(detected_name, image_path, status_callback):
                 'Guest registration cancelled'
             )
         
-        # FIX 2: Use manual input name, NOT detected name!
         # The manual input is the authoritative source
         return _process_new_guest_time_in(
             guest_info_input,  # This contains the manually entered name

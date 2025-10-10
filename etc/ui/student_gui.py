@@ -585,19 +585,11 @@ class StudentVerificationGUI:
 
     def run_verification_thread(self):
         """Run verification and update GUI"""
-        try:
-            # Call the verification function with callback
-            result = self.verification_function(self.update_status_callback)
-            
-            # Show final result
-            self.root.after(0, lambda: self.update_status({'final_result': result}))
-            
-        except Exception as e:
-            error_result = {
-                'verified': False,
-                'reason': f'Error: {str(e)}'
-            }
-            self.root.after(0, lambda: self.update_status({'final_result': error_result}))
+        # Call the verification function with callback
+        result = self.verification_function(self.update_status_callback)
+        
+        # Show final result
+        self.root.after(0, lambda: self.update_status({'final_result': result}))
 
     def update_status_callback(self, status_dict):
         """Callback for status updates"""

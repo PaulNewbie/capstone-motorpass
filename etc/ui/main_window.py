@@ -261,7 +261,7 @@ class MotorPassGUI:
         """Create responsive unified counter display with VIP and regular counters"""
         # Calculate responsive counter dimensions
         counter_width = max(150, int(self.screen_width * 0.12))
-        counter_height = max(120, int(self.screen_height * 0.15))
+        counter_height = max(140, int(self.screen_height * 0.18))
         
         # Counter container in bottom left with responsive positioning (moved up)
         margin = max(10, int(self.screen_width * 0.01))
@@ -558,7 +558,8 @@ class MotorPassGUI:
             while True:
                 try:
                     now = datetime.now()
-                    time_str = now.strftime("%H:%M:%S")
+                    # time_str = now.strftime("%H:%M:%S") 24 hours format
+                    time_str = now.strftime("%I:%M:%S %p")
                     date_str = now.strftime("%A, %B %d, %Y")
                     
                     self.time_label.config(text=time_str)

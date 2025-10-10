@@ -32,14 +32,14 @@ def create_office_table():
         
         # Insert default offices with 4-digit codes - UPDATED
         default_offices = [
-            ("IT Department", "2481"),
+            ("Administrator Office", "2481"),
             ("SDO Office", "5739"),
             ("Library", "6912"),
             ("Registrar", "3147"),
-            ("CSS Department", "8275"),
-            ("Dean's Office", "4593"),
-            ("Cashier Office", "1368"),
-            ("Main Office", "7054")
+            ("Clinic", "8275"),
+            ("CCS office", "4593"),
+            ("Faculty offuce", "1368"),
+            ("Books Store", "7054")
         ]
         
         for office_name, code in default_offices:

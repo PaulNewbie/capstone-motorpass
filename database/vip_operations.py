@@ -468,6 +468,6 @@ def get_vip_stats():
     except Exception as e:
         print(f"❌ Error getting VIP stats: {e}")
         return {
-            'currently_in': 0,
+            'current_in': 0,
             'today_total': 0
         }

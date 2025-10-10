@@ -61,79 +61,69 @@ def run_verification_with_gui(status_callback):
     set_led_processing()
     play_processing()
     
-    result = {'verified': False, 'reason': 'Unknown error'}
-    
-    try:
-        # ========== STEP 1: HELMET VERIFICATION ==========
-        if not _verify_helmet_step(status_callback):
-            cleanup_buzzer()
-            set_led_idle()
-            return handle_verification_failure(
-                status_callback, 
-                MSG_HELMET_FAILED
-            )
-        
-        # ========== STEP 2: FINGERPRINT VERIFICATION ==========
-        user_info = _verify_fingerprint_step(status_callback)
-        if not user_info:
-            cleanup_buzzer()
-            set_led_idle()
-            return handle_verification_failure(
-                status_callback,
-                MSG_FINGERPRINT_FAILED
-            )
-        
-        # ========== STEP 3: CHECK TIME STATUS ==========
-        user_id = user_info.get('unified_id', user_info.get('student_id', ''))
-        current_status = get_student_time_status(user_id)
-        log_info(MSG_CURRENT_STATUS.format(name=user_info['name'], status=current_status))
-        
-        # ========== HANDLE TIME OUT (No license scan needed) ==========
-        if current_status == 'IN':
-            return _handle_time_out(status_callback, user_info)
-        
-        # ========== STEP 4: LICENSE VERIFICATION FOR TIME IN ==========
-        license_expiration_valid = _check_license_expiration(user_info)
-        
-        if not license_expiration_valid:
-            # Record expired attempt and deny access
-            _record_expired_license_attempt(user_info)
-            
-            # Calculate days overdue with flexible date parsing
-            days_overdue = 0
-            try:
-                expiration_date_str = user_info.get('license_expiration', '2000-01-01')
-                try:
-                    exp_date = datetime.strptime(expiration_date_str, '%Y-%m-%d').date()
-                except ValueError:
-                    exp_date = datetime.strptime(expiration_date_str, '%m/%d/%Y').date()
-                days_overdue = (datetime.now().date() - exp_date).days
-            except:
-                days_overdue = 0
-            
-            cleanup_buzzer()
-            set_led_idle()
-            return handle_expired_license(
-                status_callback, 
-                user_info,
-                days_overdue
-            )
-        
-        # ========== STEP 5: LICENSE CAPTURE AND VERIFICATION ==========
-        result = _verify_license_and_record_time_in(
-            status_callback, 
-            user_info, 
-            license_expiration_valid
-        )
-        
-        return result
-        
-    except Exception as e:
-        log_error(f"Verification error: {e}")
-        return handle_verification_failure(status_callback, str(e))
-    
-    finally:
+    # ========== STEP 1: HELMET VERIFICATION ==========
+    if not _verify_helmet_step(status_callback):
         cleanup_buzzer()
+        set_led_idle()
+        return handle_verification_failure(
+            status_callback, 
+            MSG_HELMET_FAILED
+        )
+    
+    # ========== STEP 2: FINGERPRINT VERIFICATION ==========
+    user_info = _verify_fingerprint_step(status_callback)
+    if not user_info:
+        cleanup_buzzer()
+        set_led_idle()
+        return handle_verification_failure(
+            status_callback,
+            MSG_FINGERPRINT_FAILED
+        )
+    
+    # ========== STEP 3: CHECK TIME STATUS ==========
+    user_id = user_info.get('unified_id', user_info.get('student_id', ''))
+    current_status = get_student_time_status(user_id)
+    log_info(MSG_CURRENT_STATUS.format(name=user_info['name'], status=current_status))
+    
+    # ========== HANDLE TIME OUT (No license scan needed) ==========
+    if current_status == 'IN':
+        return _handle_time_out(status_callback, user_info)
+    
+    # ========== STEP 4: LICENSE VERIFICATION FOR TIME IN ==========
+    license_expiration_valid = _check_license_expiration(user_info)
+    
+    if not license_expiration_valid:
+        # Record expired attempt and deny access
+        _record_expired_license_attempt(user_info)
+        
+        # Calculate days overdue with flexible date parsing
+        days_overdue = 0
+        try:
+            expiration_date_str = user_info.get('license_expiration', '2000-01-01')
+            try:
+                exp_date = datetime.strptime(expiration_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                exp_date = datetime.strptime(expiration_date_str, '%m/%d/%Y').date()
+            days_overdue = (datetime.now().date() - exp_date).days
+        except:
+            days_overdue = 0
+        
+        cleanup_buzzer()
+        set_led_idle()
+        return handle_expired_license(
+            status_callback, 
+            user_info,
+            days_overdue
+        )
+    
+    # ========== STEP 5: LICENSE CAPTURE AND VERIFICATION ==========
+    result = _verify_license_and_record_time_in(
+        status_callback, 
+        user_info, 
+        license_expiration_valid
+    )
+    
+    return result
 
 
 # ============================================================================

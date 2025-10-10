@@ -305,14 +305,12 @@ Staff Information Found:
 Proceed with fingerprint enrollment?
             """
             
-        if messagebox.askyesno("Confirm User Information", confirmation_message):
+            if messagebox.askyesno("Confirm User Information", confirmation_message):
                 root.destroy()
                 return user_info
         else:
+            # User not found - this else block is now properly aligned
             if not messagebox.askyesno("User Not Found", 
                 f"User ID '{user_id}' not found.\n\nTry again?"):
                 root.destroy()
                 return None
-
-
-

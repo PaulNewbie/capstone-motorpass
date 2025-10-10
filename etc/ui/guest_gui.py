@@ -597,46 +597,26 @@ class GuestVerificationGUI:
         self.verification_thread.start()
     
     def run_verification_thread(self):
-        """Run verification and update GUI - UPDATE THIS FUNCTION"""
-        try:
-            if not hasattr(self, 'is_running'):
-                self.is_running = True
-                
-            if not self.is_running:
-                return
-                
-            # Call the verification function with callback
-            result = self.verification_function(self.update_status_callback)
+        """Run verification and update GUI"""
+        if not hasattr(self, 'is_running'):
+            self.is_running = True
             
-            # CHANGE: Use queue instead of direct GUI updates
-            if hasattr(self, 'result_queue') and self.is_running:
-                self.result_queue.put(('success', result))
-            else:
-                # Fallback to old method if queue not available
-                if self.root and self.is_running:
-                    try:
-                        self.root.after(0, lambda: self.update_status({'final_result': result}))
-                    except RuntimeError as e:
-                        print(f"⚠️ GUI update skipped: {e}")
-                        
-        except Exception as e:
-            print(f"❌ Verification thread error: {e}")
-            error_result = {
-                'verified': False,
-                'reason': f'Error: {str(e)}'
-            }
+        if not self.is_running:
+            return
             
-            # CHANGE: Use queue for errors too
-            if hasattr(self, 'result_queue') and self.is_running:
-                self.result_queue.put(('error', error_result))
-            else:
-                # Fallback to old method
-                if self.root and self.is_running:
-                    try:
-                        self.root.after(0, lambda: self.update_status({'final_result': error_result}))
-                    except RuntimeError as e:
-                        print(f"⚠️ Error GUI update skipped: {e}")
-
+        # Call the verification function with callback
+        result = self.verification_function(self.update_status_callback)
+        
+        # Use queue instead of direct GUI updates
+        if hasattr(self, 'result_queue') and self.is_running:
+            self.result_queue.put(('success', result))
+        else:
+            # Fallback to old method if queue not available
+            if self.root and self.is_running:
+                try:
+                    self.root.after(0, lambda: self.update_status({'final_result': result}))
+                except RuntimeError as e:
+                    print(f"⚠️ GUI update skipped: {e}")
     def check_verification_result(self):
         """ADD this new function"""
         try:
