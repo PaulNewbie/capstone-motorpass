@@ -255,7 +255,9 @@ def build_standard_success_result(user_info, timestamp, time_action='IN'):
         'student_id': user_info.get('student_id', user_info.get('unified_id', 'N/A')),
         'user_type': user_info.get('user_type', 'STUDENT'),
         'time_action': time_action,
-        'timestamp': timestamp
+        'timestamp': timestamp,
+        'plate_number': guest_info_input.get('plate_number', 'N/A'), 
+        'office': guest_info_input.get('office', 'N/A')
     }
 
 

@@ -29,9 +29,15 @@ def timeout_security_verification(guest_info, max_attempts=3):
     
     # Center window
     security_window.update_idletasks()
-    x = (security_window.winfo_screenwidth() // 2) - (200)
-    y = (security_window.winfo_screenheight() // 2) - (150)
-    security_window.geometry(f"400x300+{x}+{y}")
+    width = 400
+    height = 300
+    screen_width = security_window.winfo_screenwidth()
+    screen_height = security_window.winfo_screenheight()
+    
+    x = (screen_width // 2) - (width // 2)
+    y = (screen_height // 2) - (height // 2)
+    security_window.geometry(f"{width}x{height}+{x}+{y}")
+    security_window.update()
     
     # Make window stay on top and modal
     security_window.transient()

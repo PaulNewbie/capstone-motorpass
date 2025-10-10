@@ -42,13 +42,13 @@ class AdminFingerprintGUI:
         self.create_widgets()
     
     def center_window(self):
-        """Center the window on screen - FIXED"""
+        """Center the window on screen - FIXED TO ALWAYS CENTER"""
         # First update to get correct dimensions
         self.root.update_idletasks()
         
         # Get window dimensions
-        width = 350  # Use fixed width since geometry is set
-        height = 250  # Use fixed height since geometry is set
+        width = 350
+        height = 250
         
         # Get screen dimensions
         screen_width = self.root.winfo_screenwidth()
@@ -183,13 +183,27 @@ class FingerprintAuthGUI:
         self.start_scanning()
     
     def center_window(self):
-        """Center the window on screen"""
+        """Center the window on screen - FIXED TO ALWAYS CENTER"""
+        # First update to get correct dimensions
         self.root.update_idletasks()
-        width = self.root.winfo_width()
-        height = self.root.winfo_height()
-        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        
+        # Get window dimensions
+        width = 400
+        height = 300
+        
+        # Get screen dimensions  
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calculate center position
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        
+        # Set the geometry with proper positioning
         self.root.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Force update to apply positioning
+        self.root.update()
     
     def create_widgets(self):
         """Create all GUI widgets"""
@@ -430,9 +444,14 @@ class EnrollmentFingerprintGUI:
         
         # Center window
         self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() // 2) - (400 // 2)
-        y = (self.root.winfo_screenheight() // 2) - (350 // 2)
-        self.root.geometry(f"400x350+{x}+{y}")
+        width = 400
+        height = 350
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        self.root.update()
         
         # Keep on top
         self.root.attributes('-topmost', True)
