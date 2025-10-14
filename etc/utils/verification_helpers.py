@@ -237,28 +237,34 @@ def handle_expired_license(status_callback, user_info, days_overdue):
 
 # ============= VERIFICATION RESULT BUILDERS =============
 
-def build_standard_success_result(user_info, timestamp, time_action='IN'):
+def build_standard_success_result(user_info, timestamp, time_action='IN', guest_info_input=None):
     """
-    Build standard success result dictionary
-    
+    Build standard success result dictionary for both students and guests.
+
     Args:
-        user_info: User information dictionary
-        timestamp: Time of verification
-        time_action: 'IN' or 'OUT'
-    
+        user_info: dict - basic user or guest info
+        timestamp: str - time string (e.g., '08:01:28')
+        time_action: str - 'IN' or 'OUT'
+        guest_info_input: dict (optional) - only used for guest workflows
+
     Returns:
-        dict: Standard success result format
+        dict: Standardized result for both students and guests
     """
+    # Fallback to user_info if guest_info_input is not provided
+    info_source = guest_info_input or user_info
+
     return {
         'verified': True,
-        'name': user_info['name'],
+        'name': user_info.get('name', 'N/A'),
         'student_id': user_info.get('student_id', user_info.get('unified_id', 'N/A')),
         'user_type': user_info.get('user_type', 'STUDENT'),
         'time_action': time_action,
         'timestamp': timestamp,
-        'plate_number': guest_info_input.get('plate_number', 'N/A'), 
-        'office': guest_info_input.get('office', 'N/A')
+        'plate_number': info_source.get('plate_number', 'N/A'),
+        'office': info_source.get('office', 'N/A'),
     }
+
+
 
 
 def build_manual_override_result(user_info, timestamp):

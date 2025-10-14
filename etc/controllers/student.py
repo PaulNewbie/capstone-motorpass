@@ -478,7 +478,8 @@ def _record_successful_time_in(status_callback, user_info, final_result, license
         
         if record_time_in(user_info):
             timestamp = handle_time_in_success(status_callback)
-            result = build_standard_success_result(user_info, timestamp, 'IN')
+            # ✅ FIXED LINE — use user_info only
+            return build_standard_success_result(user_info, timestamp, 'IN')
         else:
             return handle_time_in_failure(status_callback)
     
