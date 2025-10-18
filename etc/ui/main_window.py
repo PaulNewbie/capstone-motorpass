@@ -393,8 +393,8 @@ class MotorPassGUI:
         else:
             button_height = max(52, int(overlay_height * 0.11))
             
-        self.create_enhanced_button(buttons_frame, "👨‍🎓 STUDENT/STAFF", self.student_staff_clicked, "#D4AF37", "#8B7355", button_height, button_font_size)
-        self.create_enhanced_button(buttons_frame, "👤 VISITOR", self.guest_clicked, "#D4AF37", "#8B7355", button_height, button_font_size)
+        self.create_enhanced_button(buttons_frame, " STUDENT/STAFF", self.student_staff_clicked, "#D4AF37", "#8B7355", button_height, button_font_size)
+        self.create_enhanced_button(buttons_frame, " VISITOR", self.guest_clicked, "#D4AF37", "#8B7355", button_height, button_font_size)
         self.create_enhanced_button(buttons_frame, "⚙️ ADMIN", self.admin_clicked, "#CD853F", "#A0522D", button_height, button_font_size)
         
         # Separator line

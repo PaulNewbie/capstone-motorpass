@@ -437,7 +437,16 @@ def _process_new_guest_time_in(guest_info_input, image_path, status_callback):
                 'user_type': 'GUEST'
             }
             
-            return build_standard_success_result(guest_user_info, timestamp, 'IN')
+            # --- START OF THE FIX ---
+            # Create the standard success result first
+            success_result = build_standard_success_result(guest_user_info, timestamp, 'IN')
+            
+            # Now, add the missing plate number and office info
+            success_result['plate_number'] = guest_info_input.get('plate_number', 'N/A')
+            success_result['office'] = guest_info_input.get('office', 'N/A')
+            
+            return success_result
+            # --- END OF THE FIX ---
         else:
             status_callback({'current_step': '❌ Failed to record TIME IN'})
             cleanup_image_file(image_path)

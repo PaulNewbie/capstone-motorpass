@@ -361,124 +361,130 @@ class AdminPanelGUI:
             self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to load records: {str(e)}"))
     
     def display_time_records_window(self, records):
-        """Display time records in a modern window - RESPONSIVE"""
-        # Create new window with responsive sizing
-        records_window = tk.Toplevel(self.root)
-        records_window.title("Time Records")
+            """Display time records in a modern window - RESPONSIVE"""
+            # Create new window with responsive sizing
+            records_window = tk.Toplevel(self.root)
+            records_window.title("Time Records")
+
+            # Responsive window sizing
+            if self.is_square_display:
+                window_width = int(self.screen_width * 0.80)
+                window_height = int(self.screen_height * 0.75)
+            else:
+                window_width = int(self.screen_width * 0.75)
+                window_height = int(self.screen_height * 0.80)
+
+            # Center window
+            x = (self.screen_width - window_width) // 2
+            y = (self.screen_height - window_height) // 2
+            records_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+            records_window.configure(bg=self.colors['light'])
+
+            # Responsive header
+            header_font_size = max(16, int(self.display_size / 50))
+            header_height = max(60, int(window_height * 0.10))
+            header = tk.Frame(records_window, bg=self.colors['primary'], height=header_height)
+            header.pack(fill="x")
+            header.pack_propagate(False)
+
+            tk.Label(header, text="🕒 TIME RECORDS",
+                    font=("Arial", header_font_size, "bold"), fg=self.colors['white'],
+                    bg=self.colors['primary']).pack(expand=True)
+
+            if not records:
+                # Empty state
+                empty_frame = tk.Frame(records_window, bg=self.colors['white'])
+                empty_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+                empty_icon_size = max(32, int(self.display_size / 25))
+                empty_text_size = max(12, int(self.display_size / 65))
+
+                tk.Label(empty_frame, text="📭", font=("Arial", empty_icon_size),
+                        fg=self.colors['light'], bg=self.colors['white']).pack(pady=(50, 20))
+                tk.Label(empty_frame, text="No time records found",
+                        font=("Arial", empty_text_size), fg=self.colors['secondary'],
+                        bg=self.colors['white']).pack()
+            else:
+                # Create modern table
+                table_frame = tk.Frame(records_window, bg=self.colors['white'])
+                table_frame.pack(fill="both", expand=True, padx=15, pady=15)
+
+                # Configure style
+                style = ttk.Style()
+                style.theme_use('clam')
+                style.configure('Treeview',
+                              background=self.colors['white'],
+                              fieldbackground=self.colors['white'],
+                              borderwidth=0,
+                              font=('Arial', max(8, int(self.display_size / 100))))
+                style.configure('Treeview.Heading',
+                              background=self.colors['light'],
+                              font=('Arial', max(9, int(self.display_size / 90)), 'bold'))
+                style.map('Treeview', background=[('selected', self.colors['info'])])
+
+                # Create treeview with responsive height
+                tree_height = max(15, int(window_height / 30))
+                tree = ttk.Treeview(table_frame,
+                                   columns=('Date', 'Time', 'ID', 'Name', 'Type', 'Status'),
+                                   show='tree headings', height=tree_height)
+
+                # Configure columns with responsive widths
+                base_width = max(80, int(window_width / 10))
+                tree.column('#0', width=0, stretch=False)
+                tree.column('Date', width=base_width)
+                tree.column('Time', width=int(base_width * 0.8))
+                tree.column('ID', width=base_width)
+                tree.column('Name', width=int(base_width * 1.8))
+                tree.column('Type', width=int(base_width * 0.8))
+                tree.column('Status', width=int(base_width * 0.6))
+
+                # Configure headings
+                for col in ['Date', 'Time', 'ID', 'Name', 'Type', 'Status']:
+                    tree.heading(col, text=col)
+
+                # Add records with alternating colors
+                for i, record in enumerate(records):
+                    # --- START OF THE FIX ---
+                    user_type = record.get('user_type', 'STUDENT')
+                    if user_type == 'GUEST':
+                        user_type = 'VISITOR'  # Change the label here
+                    # --- END OF THE FIX ---
+
+                    values = (
+                        record.get('date', 'N/A'),
+                        record.get('time', 'N/A'),
+                        record.get('student_id', 'N/A'),
+                        record.get('student_name', 'N/A'),
+                        user_type, # Use the modified user_type
+                        record.get('status', 'N/A')
+                    )
+
+                    tag = 'even' if i % 2 == 0 else 'odd'
+                    status_tag = 'in' if record.get('status') == 'IN' else 'out'
+                    tree.insert('', 'end', values=values, tags=(tag, status_tag))
+
+                # Configure tags
+                tree.tag_configure('even', background=self.colors['light'])
+                tree.tag_configure('odd', background=self.colors['white'])
+                tree.tag_configure('in', foreground=self.colors['success'])
+                tree.tag_configure('out', foreground=self.colors['accent'])
+
+                # Scrollbar
+                scrollbar = ttk.Scrollbar(table_frame, orient='vertical', command=tree.yview)
+                tree.configure(yscrollcommand=scrollbar.set)
+
+                tree.pack(side='left', fill='both', expand=True)
+                scrollbar.pack(side='right', fill='y')
+
+            # Close button - responsive
+            close_btn_size = max(10, int(self.display_size / 70))
+            close_btn = tk.Button(records_window, text="CLOSE",
+                                 font=("Arial", close_btn_size, "bold"),
+                                 bg=self.colors['accent'], fg=self.colors['white'],
+                                 relief='flat', bd=0, cursor="hand2",
+                                 padx=30, pady=10, command=records_window.destroy)
+            close_btn.pack(pady=15)
         
-        # Responsive window sizing
-        if self.is_square_display:
-            window_width = int(self.screen_width * 0.80)
-            window_height = int(self.screen_height * 0.75)
-        else:
-            window_width = int(self.screen_width * 0.75)
-            window_height = int(self.screen_height * 0.80)
-            
-        # Center window
-        x = (self.screen_width - window_width) // 2
-        y = (self.screen_height - window_height) // 2
-        records_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        records_window.configure(bg=self.colors['light'])
-        
-        # Responsive header
-        header_font_size = max(16, int(self.display_size / 50))
-        header_height = max(60, int(window_height * 0.10))
-        header = tk.Frame(records_window, bg=self.colors['primary'], height=header_height)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        
-        tk.Label(header, text="🕒 TIME RECORDS", 
-                font=("Arial", header_font_size, "bold"), fg=self.colors['white'], 
-                bg=self.colors['primary']).pack(expand=True)
-        
-        if not records:
-            # Empty state
-            empty_frame = tk.Frame(records_window, bg=self.colors['white'])
-            empty_frame.pack(fill="both", expand=True, padx=20, pady=20)
-            
-            empty_icon_size = max(32, int(self.display_size / 25))
-            empty_text_size = max(12, int(self.display_size / 65))
-            
-            tk.Label(empty_frame, text="📭", font=("Arial", empty_icon_size), 
-                    fg=self.colors['light'], bg=self.colors['white']).pack(pady=(50, 20))
-            tk.Label(empty_frame, text="No time records found", 
-                    font=("Arial", empty_text_size), fg=self.colors['secondary'], 
-                    bg=self.colors['white']).pack()
-        else:
-            # Create modern table
-            table_frame = tk.Frame(records_window, bg=self.colors['white'])
-            table_frame.pack(fill="both", expand=True, padx=15, pady=15)
-            
-            # Configure style
-            style = ttk.Style()
-            style.theme_use('clam')
-            style.configure('Treeview', 
-                          background=self.colors['white'],
-                          fieldbackground=self.colors['white'],
-                          borderwidth=0,
-                          font=('Arial', max(8, int(self.display_size / 100))))
-            style.configure('Treeview.Heading', 
-                          background=self.colors['light'],
-                          font=('Arial', max(9, int(self.display_size / 90)), 'bold'))
-            style.map('Treeview', background=[('selected', self.colors['info'])])
-            
-            # Create treeview with responsive height
-            tree_height = max(15, int(window_height / 30))
-            tree = ttk.Treeview(table_frame, 
-                               columns=('Date', 'Time', 'ID', 'Name', 'Type', 'Status'), 
-                               show='tree headings', height=tree_height)
-            
-            # Configure columns with responsive widths
-            base_width = max(80, int(window_width / 10))
-            tree.column('#0', width=0, stretch=False)
-            tree.column('Date', width=base_width)
-            tree.column('Time', width=int(base_width * 0.8))
-            tree.column('ID', width=base_width)
-            tree.column('Name', width=int(base_width * 1.8))
-            tree.column('Type', width=int(base_width * 0.8))
-            tree.column('Status', width=int(base_width * 0.6))
-            
-            # Configure headings
-            for col in ['Date', 'Time', 'ID', 'Name', 'Type', 'Status']:
-                tree.heading(col, text=col)
-            
-            # Add records with alternating colors
-            for i, record in enumerate(records):
-                values = (
-                    record.get('date', 'N/A'),
-                    record.get('time', 'N/A'),
-                    record.get('student_id', 'N/A'),
-                    record.get('student_name', 'N/A'),
-                    record.get('user_type', 'STUDENT'),
-                    record.get('status', 'N/A')
-                )
-                
-                tag = 'even' if i % 2 == 0 else 'odd'
-                status_tag = 'in' if record.get('status') == 'IN' else 'out'
-                tree.insert('', 'end', values=values, tags=(tag, status_tag))
-            
-            # Configure tags
-            tree.tag_configure('even', background=self.colors['light'])
-            tree.tag_configure('odd', background=self.colors['white'])
-            tree.tag_configure('in', foreground=self.colors['success'])
-            tree.tag_configure('out', foreground=self.colors['accent'])
-            
-            # Scrollbar
-            scrollbar = ttk.Scrollbar(table_frame, orient='vertical', command=tree.yview)
-            tree.configure(yscrollcommand=scrollbar.set)
-            
-            tree.pack(side='left', fill='both', expand=True)
-            scrollbar.pack(side='right', fill='y')
-        
-        # Close button - responsive
-        close_btn_size = max(10, int(self.display_size / 70))
-        close_btn = tk.Button(records_window, text="CLOSE", 
-                             font=("Arial", close_btn_size, "bold"), 
-                             bg=self.colors['accent'], fg=self.colors['white'],
-                             relief='flat', bd=0, cursor="hand2",
-                             padx=30, pady=10, command=records_window.destroy)
-        close_btn.pack(pady=15)
-    
     def clear_time_records(self):
         """Clear all time records - FIXED"""
         # Custom confirmation dialog
@@ -1247,7 +1253,7 @@ class AdminPanelGUI:
                             stats.get('total_staff', 0), 
                             self.colors['warning'], card_spacing)
         
-        self.create_stat_card(sidebar, "🚗", "Currently Inside", 
+        self.create_stat_card(sidebar, "", "Currently Inside", 
                             stats.get('users_currently_in', 0), 
                             self.colors['accent'], card_spacing)
         
@@ -1302,7 +1308,7 @@ class AdminPanelGUI:
             ("👥", "Total", stats.get('total_students', 0) + stats.get('total_staff', 0), self.colors['info']),
             ("🎓", "Students", stats.get('total_students', 0), self.colors['success']),
             ("👔", "Staff", stats.get('total_staff', 0), self.colors['warning']),
-            ("🚗", "Inside", stats.get('users_currently_in', 0), self.colors['accent']),
+            ("", "Inside", stats.get('users_currently_in', 0), self.colors['accent']),
             ("📈", "Activity", stats.get('todays_activity', 0), self.colors['gold'])
         ]
         
