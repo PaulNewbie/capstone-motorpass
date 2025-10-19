@@ -359,7 +359,7 @@ class GuestVerificationGUI:
         panel_title_font = max(13, int(self.screen_width / 65))
         panel_title_padding = max(12, int(self.screen_height * 0.015))
         
-        tk.Label(self.guest_info_panel, text="👤 GUEST DETAILS", 
+        tk.Label(self.guest_info_panel, text="👤 VISITORS DETAILS", 
                 font=("Arial", panel_title_font, "bold"), fg="#2e7d32", bg='#e8f5e9').pack(pady=panel_title_padding)
         
         self.guest_details_frame = tk.Frame(self.guest_info_panel, bg='#e8f5e9')
@@ -701,7 +701,7 @@ class GuestVerificationGUI:
         """Main GUI loop - UPDATE THIS FUNCTION"""
         try:
             print(f"\n{'='*60}")
-            print(f"🎫 Guest Verification GUI Started")
+            print(f"🎫 Visitors Verification GUI Started")
             print(f"📱 Responsive Mode: {self.screen_width}x{self.screen_height}")
             if self.is_square_display:
                 print(f"📺 Display Type: Square/4:3 Touch Screen Optimized")

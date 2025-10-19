@@ -23,7 +23,7 @@ from etc.services.hardware.led_control import set_led_white_lighting
 # ============== CONFIGURATION ==============
 
 # --- Online OCR Configuration ---
-OCR_SPACE_API_KEY = 'K86208907288957'  # Your API key from ocr_project/final_test.py
+OCR_SPACE_API_KEY = 'K85152276488957'  # Your API key from ocr_project/final_test.py
 OCR_SPACE_URL = 'https://api.ocr.space/parse/image'
 
 # --- Offline OCR Configuration ---
@@ -47,6 +47,12 @@ VERIFICATION_KEYWORDS = [
 MIN_KEYWORDS_FOR_SUCCESS = 3
 MIN_CONFIDENCE_SCORE = 60
 
+# --- NEW/MODIFIED CONSTANTS FOR DATE EXTRACTION ---
+# Date pattern to match YYYY/MM/DD or DD/MM/YYYY with different separators
+DATE_PATTERN = r'(\d{4}[/.-]\d{2}[/.-]\d{2}|\d{2}[/.-]\d{2}[/.-]\d{4})'
+EXPIRATION_KEYWORDS_SEARCH = ["EXPIRATION DATE", "EXPIRATION", "EXP DATE", "DATE OF EXPIRATION"]
+# ---------------------------------------------------
+
 @dataclass
 class NameInfo:
     document_type: str
@@ -55,6 +61,9 @@ class NameInfo:
     formatted_text: str
     fingerprint_info: Optional[dict] = None
     match_score: Optional[float] = None
+    # === RE-ADDED: Expiration Date ===
+    expiration_date: Optional[str] = None
+    # =================================
 
 # ============== NETWORK & ONLINE OCR ==============
 
@@ -70,7 +79,7 @@ def _is_online() -> bool:
         return False
 
 def _extract_text_online(image_path: str) -> Optional[str]:
-    """Extracts text using the OCR.space API."""
+    """Extracts text using the OCR.space API. (FIXED: Checks for empty text)"""
     try:
         if 'K81234567888957' in OCR_SPACE_API_KEY:
             print("⚠️ WARNING: OCR.space API key is a placeholder. Please update.")
@@ -96,6 +105,13 @@ def _extract_text_online(image_path: str) -> Optional[str]:
             return None
 
         raw_text = result['ParsedResults'][0]['ParsedText']
+        
+        # --- FIX 1: Check for empty text to prevent misleading success/failure logs ---
+        if not raw_text.strip():
+            print("❌ API OCR successful, but returned EMPTY TEXT. Treating as failure.")
+            return None
+        # -----------------------------------------------------------------------------
+
         print("✅ API OCR successful.")
         return raw_text
 
@@ -232,6 +248,56 @@ def _calculate_confidence_score(text: str, keywords_found: int) -> int:
         base_score += 5
 
     return min(100, int(base_score))
+
+# --- FIXED FUNCTION TO EXTRACT EXPIRATION DATE (Bug Fix) ---
+
+def _extract_expiration_date(raw_text: str) -> Optional[str]:
+    """
+    Extracts the expiration date by finding all valid date patterns and selecting
+    the one that is not the Date of Birth. It assumes the expiration date is the
+    latest (most future) date on the license.
+    """
+    # This pattern specifically looks for YYYY/MM/DD or YYYY-MM-DD formats
+    # The \b ensures we match whole words and don't pick dates from inside other numbers.
+    DATE_PATTERN = r'\b(\d{4}[/.-]\d{2}[/.-]\d{2})\b'
+
+    all_dates_found = re.findall(DATE_PATTERN, raw_text)
+
+    if not all_dates_found:
+        return None
+
+    valid_dates = []
+    for date_str in all_dates_found:
+        # Normalize the date format to use '/' for consistency
+        normalized_date_str = date_str.replace('-', '/').replace('.', '/')
+        
+        try:
+            # Convert string to a real date object to validate it (e.g., month isn't 13)
+            date_obj = datetime.strptime(normalized_date_str, '%Y/%m/%d')
+
+            # Check the context to see if it's the "Date of Birth"
+            date_index = raw_text.find(date_str)
+            context_before = raw_text[max(0, date_index - 30):date_index].upper()
+
+            # If the text before the date mentions "BIRTH", we skip it.
+            if "BIRTH" in context_before or "DOB" in context_before:
+                continue
+            
+            valid_dates.append(date_obj)
+
+        except ValueError:
+            # Ignore matches that aren't valid dates (e.g., "2025/15/50")
+            continue
+
+    if not valid_dates:
+        return None
+
+    # The expiration date is the latest date found on the license.
+    latest_date = max(valid_dates)
+
+    return latest_date.strftime('%Y/%m/%d')
+
+# -----------------------------------------------
 
 def _extract_text_smart(image_path: str, is_guest: bool = False, reference_name: str = "") -> str:
     """
@@ -423,30 +489,33 @@ def find_best_line_match(input_name: str, ocr_lines: List[str]) -> Tuple[Optiona
 
     return best_match, best_score
 
-def extract_name_from_lines(image_path: str, reference_name: str = "", best_ocr_match: str = "", match_score: float = 0.0) -> Dict[str, str]:
+# In services/license_reader.py
+
+def extract_name_from_lines(ocr_text: str, reference_name: str = "", best_ocr_match: str = "", match_score: float = 0.0) -> Dict[str, str]:
+    """
+    MODIFIED to accept pre-extracted ocr_text to avoid a redundant API call.
+    """
     if not reference_name:
-        return extract_guest_name_from_license_simple(image_path)
+        # This path shouldn't be taken for students, but it's safe to keep
+        return extract_guest_name_from_license_simple(ocr_text)
 
-    raw_text = _extract_text_smart(image_path, is_guest=False)
-
-    # NEW: Check for Student Permit restriction
+    # NO LONGER MAKES AN API CALL HERE. USES THE PROVIDED TEXT.
+    raw_text = ocr_text 
+    
     if _check_student_permit(raw_text):
         print("❌ Student Permit detected in license processing - Access denied")
         raise ValueError("STUDENT_PERMIT_DETECTED")
 
     full_text = " ".join(raw_text.splitlines()).upper()
-
     keywords_found = _count_verification_keywords(full_text)
-
-    # NEW: Check if names match - if they do, always consider license detected
     name_matches = False
+
     if reference_name and match_score >= 0.65:
         name_matches = True
         print(f"🎯 Name match detected ({match_score*100:.1f}%) - License validation override applied")
 
-    # Override license detection if names match
     if name_matches:
-        is_verified = True  # Force verification to true when names match
+        is_verified = True
         doc_status = "Driver's License Detected (Name Match Override)"
     else:
         is_verified = keywords_found >= 1
@@ -454,7 +523,6 @@ def extract_name_from_lines(image_path: str, reference_name: str = "", best_ocr_
 
     name_info = {"Document Verified": doc_status}
 
-    # Check match confidence levels
     if reference_name and match_score >= 0.65:
         name_info.update({
             "Name": reference_name,
@@ -473,6 +541,8 @@ def extract_name_from_lines(image_path: str, reference_name: str = "", best_ocr_
             name_info.update({"Name": detected_name, "Matched From": "Pattern Detection"})
         else:
             name_info["Name"] = "Not Found"
+            if reference_name:
+                name_info["Name"] = reference_name
 
     return name_info
 
@@ -676,151 +746,72 @@ def _format_extracted_name_simple(name: str) -> str:
     return name.upper()
 
 def _detect_name_pattern(raw_text: str) -> Optional[str]:
+    """
+    Detects a name in the format 'SURNAME, FIRSTNAME [MIDDLENAME]' from OCR text.
+    This pattern is more robust for Philippine Driver's Licenses.
+    """
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    potential_name = None
+    name_marker_found_at = -1
 
-    # Extended filter keywords for better name detection
-    filter_keywords = [
-        'REPUBLIC', 'PHILIPPINES', 'DEPARTMENT', 'TRANSPORTATION',
-        'LAND TRANSPORTATION OFFICE', 'DRIVER', 'LICENSE', 'DRIVERS LICENSE',
-        'NON-PROFESSIONAL', 'PROFESSIONAL', 'NATIONALITY', 'ADDRESS',
-        'DATE OF BIRTH', 'EXPIRATION', 'AGENCY CODE', 'CONDITIONS',
-        'EYES COLOR', 'WEIGHT', 'HEIGHT', 'BLOOD TYPE', 'RESTRICTION',
-        'SIGNATURE', 'PHOTO', 'FIRST NAME', 'LAST NAME', 'MIDDLE NAME',
-        'CITY', 'PROVINCE', 'BARANGAY', 'STREET', 'ROAD', 'AVENUE',
-        'RESIDENCIA', 'BLK', 'LOT','Ln,Fnmn'
-    ]
-
-    # Stop markers - if we see these after finding a name, stop looking
-    stop_markers = [
-        'NATIONALITY', 'SEX', 'DATE OF BIRTH', 'WEIGHT', 'HEIGHT',
-        'ADDRESS', 'LICENSE NO', 'EXPIRATION DATE', 'AGENCY CODE',
-        'BLOOD TYPE', 'EYES COLOR', 'DL CODES', 'CONDITIONS',
-        'SIGNATURE', 'PHL', 'BLK', 'LOT', 'RESIDENCIA',
-        # Also stop if we see patterns like these
-        'M', 'F',  # Sex indicators
-        'BROWN', 'BLACK', 'BLUE',  # Eye colors
-        'A', 'B', 'O', 'AB',  # Blood types
-        'NONE', 'A1', 'A', 'B', 'B1', 'B2',  # DL codes/conditions
-        # Additional stop patterns
-        'EN', 'ED', 'AC', 'YC', 'DLC', 'SI', 'S'  # Common abbreviations on licenses
-    ]
-
-    # Name field markers
-    name_markers = ['LNFMMH', 'LNFMM', 'LN FN MN', 'LAST NAME', 'FIRST NAME', 'MIDDLE NAME', 'LN.FN.MN', 'LN.FN,MN','Ln,Fnmn']
-
-    # Special handling for lines immediately after name markers
-    name_found = None
+    # --- Pass 1: Look for the line right after a name marker (high confidence) ---
+    name_markers = ['LAST NAME', 'FIRST NAME', 'MIDDLE NAME', 'LN', 'FN', 'MN']
     for i, line in enumerate(lines):
-        line_upper = line.upper().strip()
-
-        # If we already found a name and encounter a stop marker, return the name
-        if name_found:
-            # Check if current line contains stop markers
-            for marker in stop_markers:
-                if marker in line_upper or line_upper == marker:
-                    return name_found
-
-            # Check if line contains date pattern (YYYY/MM/DD or similar)
-            if re.search(r'\d{4}[/-]\d{2}[/-]\d{2}|\d{2}[/-]\d{2}[/-]\d{4}', line_upper):
-                return name_found
-
-            # Check if line contains only numbers (weight, height, etc)
-            if re.match(r'^[\d\s\.]+$', line_upper):
-                return name_found
-
-        # Check if this line contains name field markers
-        marker_found = False
-        for marker in name_markers:
-            if marker in line_upper.replace(' ', '').replace('.', '').replace(',', ''):
-                marker_found = True
-                break
-
-        if marker_found:
-            # The next line is likely the name
+        line_upper = line.upper()
+        # A good marker line contains at least two of the name-related keywords
+        if sum(1 for marker in name_markers if marker in line_upper) >= 2:
+            name_marker_found_at = i
+            # The next line is the most likely candidate for the name
             if i + 1 < len(lines):
-                next_line = lines[i + 1].strip()
-                next_line_upper = next_line.upper()
+                candidate_line = lines[i + 1].strip().upper()
+                # A valid name must have one comma and no digits.
+                if candidate_line.count(',') == 1 and not any(char.isdigit() for char in candidate_line):
+                    parts = [p.strip() for p in candidate_line.split(',')]
+                    # Ensure both surname and given name parts are valid
+                    if len(parts) == 2 and parts[0] and parts[1]:
+                        # This is a high-confidence match, return it immediately.
+                        return candidate_line
+            break # Stop after finding the first valid marker line
 
-                # Skip if next line is a stop marker
-                if any(marker in next_line_upper or next_line_upper == marker for marker in stop_markers):
-                    continue
-
-                # Check if it looks like a name with exactly one comma
-                if not any(char.isdigit() for char in next_line) and len(next_line) >= 5:
-                    clean_name = re.sub(r"[^A-Z\s,]", "", next_line_upper).strip()
-                    comma_count = clean_name.count(',')
-
-                    # STRICT: Must have exactly one comma
-                    if comma_count == 1 and len(clean_name) >= 5:
-                        parts = clean_name.split(',')
-                        lastname = parts[0].strip()
-                        firstname = parts[1].strip()
-                        # Both parts should exist and be alphabetic
-                        if (lastname and firstname and
-                            lastname.replace(' ', '').isalpha() and
-                            firstname.replace(' ', '').isalpha() and
-                            len(lastname) >= 3 and len(firstname) >= 2 and
-                            len(lastname) <= 20 and len(firstname) <= 30):
-                            name_found = clean_name.title()
-                            continue  # Continue to check for stop markers
+    # --- Pass 2: Fallback if no marker was found, search all lines for the pattern ---
+    for i, line in enumerate(lines):
+        # Skip the marker line itself to avoid matching it as a name
+        if i == name_marker_found_at:
             continue
 
-        # Skip if we haven't found name markers yet
-        if not name_found:
-            # Skip empty or very short lines
-            if len(line_upper) < 5:
-                continue
+        # Rule: Must have exactly one comma, no digits, and be a reasonable length.
+        if line.count(',') != 1 or any(char.isdigit() for char in line) or not (5 < len(line) < 50):
+            continue
 
-            # Skip lines with numbers
-            if any(char.isdigit() for char in line_upper):
-                continue
+        parts = [p.strip() for p in line.split(',')]
+        if len(parts) == 2 and parts[0] and parts[1]:
+            surname = parts[0]
+            given_names = parts[1]
 
-            # Skip lines containing filter keywords ONLY if they're exact matches
-            skip_line = False
-            for keyword in filter_keywords:
-                if line_upper == keyword or line_upper.startswith(keyword + ' '):
-                    skip_line = True
-                    break
+            # Rule: Both parts must contain only letters and spaces.
+            is_surname_valid = all(c.isalpha() or c.isspace() for c in surname)
+            is_given_name_valid = all(c.isalpha() or c.isspace() for c in given_names)
 
-            if skip_line:
-                continue
+            if is_surname_valid and is_given_name_valid:
+                # Rule: Avoid lines that look like addresses.
+                line_upper = line.upper()
+                address_keywords = ['BLK', 'LOT', 'STREET', 'AVE', 'ROAD', 'BRGY', 'CITY']
+                if not any(keyword in line_upper for keyword in address_keywords):
+                    # This is our best guess.
+                    return line.upper()
 
-            # Skip lines that are stop markers
-            if line_upper in stop_markers or any(line_upper == marker for marker in stop_markers):
-                continue
+    return None # Return None if no suitable name is found
 
-            # Clean the line for final check
-            clean = re.sub(r"[^A-Z\s,]", "", line_upper).strip()
-
-            # STRICT CHECK: Must have exactly one comma for Philippine license format
-            comma_count = clean.count(',')
-            if comma_count != 1:
-                continue  # Skip if not exactly one comma
-
-            # Validate the name format
-            if len(clean) >= 5 and len(clean) <= 50:
-                parts = clean.split(',')
-                lastname = parts[0].strip()
-                firstname = parts[1].strip()
-
-                # Both parts should be alphabetic and have minimum length
-                if (lastname.replace(' ', '').isalpha() and
-                    firstname.replace(' ', '').isalpha() and
-                    len(lastname) >= 2 and len(firstname) >= 2 and
-                    len(lastname) <= 20 and len(firstname) <= 30):
-                    # Additional check: make sure it doesn't look like an address
-                    if not any(addr_marker in clean for addr_marker in ['BLK', 'LOT', 'PH', 'PHASE']):
-                        name_found = clean.title()
-
-    return name_found
-
-def package_name_info(structured_data: Dict[str, str], basic_text: str, fingerprint_info: Optional[dict] = None) -> NameInfo:
+def package_name_info(structured_data: Dict[str, str], basic_text: str, 
+                      fingerprint_info: Optional[dict] = None,
+                      expiration_date: Optional[str] = None) -> NameInfo:
     return NameInfo(
         document_type="Driver's License",
         name=structured_data.get('Name', 'Not Found'),
         document_verified=structured_data.get('Document Verified', 'Unverified'),
         formatted_text=basic_text,
-        fingerprint_info=fingerprint_info
+        fingerprint_info=fingerprint_info,
+        expiration_date=expiration_date
     )
 
 # ============== CAMERA FUNCTIONS ==============
@@ -1183,58 +1174,53 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
 # ============== VERIFICATION FUNCTIONS ==============
 
 def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
-    """License reading without retake loop - single attempt only"""
+    """
+    MODIFIED to perform OCR only ONCE and pass the text to other functions.
+    """
     reference_name = fingerprint_info['name']
 
     try:
-        # Extract text from image
+        # =================== THE FIX: OCR ONCE ===================
+        # This is now the ONLY OCR call in this entire flow.
         try:
             basic_text = extract_text_from_image(image_path)
         except ValueError as e:
+            # Handle student permit detection directly
             if "STUDENT_PERMIT_DETECTED" in str(e):
-                # Return error result for Student Permit
                 error_packaged = package_name_info(
                     {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"},
-                    "Student Permit detected - Access denied", fingerprint_info
+                    "Student Permit detected - Access denied", fingerprint_info, expiration_date=None
                 )
                 error_packaged.match_score = 0.0
                 return error_packaged
             else:
                 raise e
+        # =========================================================
 
-        # FIXED: Skip find_best_line_match for students/staff - use pattern detection directly
-        ocr_lines = [line.strip() for line in basic_text.splitlines() if line.strip()]
+        extracted_date = _extract_expiration_date(basic_text)
+        print(f"📅 Extracted Expiration Date: {extracted_date or 'Not Found'}")
+        
         detected_name = _detect_name_pattern(basic_text)
 
-        # Calculate similarity using the same logic as student.py
+        # Calculate similarity score
         import difflib
-        if detected_name and reference_name:
-            sim_score = difflib.SequenceMatcher(
-                None,
-                detected_name.lower().strip(),
-                reference_name.lower().strip()
-            ).ratio()
+        normalized_detected_raw = detected_name.lower().strip().replace('\xa0', '').replace(' ', '').replace(',', '') if detected_name else ""
+        normalized_reference_raw = reference_name.lower().strip().replace('\xa0', '').replace(' ', '').replace(',', '') if reference_name else ""
+        
+        if normalized_detected_raw and normalized_reference_raw:
+            sim_score = difflib.SequenceMatcher(None, normalized_detected_raw, normalized_reference_raw).ratio()
         else:
-            sim_score = 0.0
+            sim_score = difflib.SequenceMatcher(None, basic_text.lower().replace('\xa0', ' ').replace('\n', ' '), reference_name.lower().strip().replace('\xa0', ' ')).ratio()
 
-        # Extract structured name data
-        try:
-            structured_data = extract_name_from_lines(image_path, reference_name, detected_name, sim_score)
-        except ValueError as e:
-            if "STUDENT_PERMIT_DETECTED" in str(e):
-                # Return error result for Student Permit
-                error_packaged = package_name_info(
-                    {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"},
-                    "Student Permit detected - Access denied", fingerprint_info
-                )
-                error_packaged.match_score = 0.0
-                return error_packaged
-            else:
-                raise e
+        # Pass the basic_text we already have, NOT the image_path
+        structured_data = extract_name_from_lines(basic_text, reference_name, detected_name, sim_score)
 
         # Package the result
-        packaged = package_name_info(structured_data, basic_text, fingerprint_info)
-        packaged.match_score = sim_score  # Use the accurate similarity score
+        packaged = package_name_info(structured_data, basic_text, fingerprint_info, expiration_date=extracted_date)
+        packaged.match_score = sim_score
+        
+        if packaged.name == "Not Found" and reference_name:
+             packaged.name = reference_name
 
         return packaged
 
@@ -1242,12 +1228,11 @@ def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
         print(f"❌ Error in licenseRead: {e}")
         error_packaged = package_name_info(
             {"Name": "Not Found", "Document Verified": "Failed"},
-            "Processing failed", fingerprint_info
+            "Processing failed", fingerprint_info, expiration_date=None
         )
         error_packaged.match_score = 0.0
         return error_packaged
     finally:
-        # Clean up the image file
         safe_delete_temp_file(image_path)
 
 def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
@@ -1268,12 +1253,16 @@ def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
                 }
                 error_packaged = package_name_info(
                     {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"},
-                    "Student Permit detected - Access denied", guest_fingerprint_info
+                    "Student Permit detected - Access denied", guest_fingerprint_info, expiration_date=None
                 )
                 error_packaged.match_score = 0.0
                 return error_packaged
             else:
                 raise e
+        
+        # Extract expiration date
+        extracted_date = _extract_expiration_date(basic_text)
+        print(f"📅 Guest Extracted Expiration Date: {extracted_date or 'Not Found'}")
 
         # Extract OCR lines and use find_best_line_match for consistency
         ocr_lines = [line.strip() for line in basic_text.splitlines() if line.strip()]
@@ -1292,7 +1281,7 @@ def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
                 }
                 error_packaged = package_name_info(
                     {"Name": "STUDENT PERMIT DETECTED", "Document Verified": "DENIED - Student Permit Not Allowed"},
-                    "Student Permit detected - Access denied", guest_fingerprint_info
+                    "Student Permit detected - Access denied", guest_fingerprint_info, expiration_date=None
                 )
                 error_packaged.match_score = 0.0
                 return error_packaged
@@ -1307,7 +1296,7 @@ def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
         }
 
         # Package the result
-        packaged = package_name_info(structured_data, basic_text, guest_fingerprint_info)
+        packaged = package_name_info(structured_data, basic_text, guest_fingerprint_info, expiration_date=extracted_date)
         packaged.match_score = sim_score
 
         # SIMPLIFIED: Auto-accept all guest results - no retake prompts
@@ -1323,8 +1312,9 @@ def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
         }
         error_packaged = package_name_info(
             {"Name": "Processing Error", "Document Verified": "Failed"},
-            "Processing failed", guest_fingerprint_info
+            "Processing failed", guest_fingerprint_info, expiration_date=None
         )
+            
         error_packaged.match_score = 0.0
         return error_packaged
     finally:
@@ -1390,6 +1380,7 @@ def complete_verification_flow(image_path: str, fingerprint_info: dict,
     print(f"🪖 Helmet: {'✅' if helmet_verified else '❌'}")
     print(f"🔒 Fingerprint: {'✅' if fingerprint_verified else '❌'} ({fingerprint_info['confidence']}%)")
     print(f"📅 License Valid: {'✅' if license_expiration_valid else '❌'}")
+    print(f"📅 Expiration Date: {license_result.expiration_date or 'Not Found'}")
     print(f"🆔 License Detected: {'✅' if license_detected else '❌'}" +
           (" (Name Match Override)" if name_matching_verified and license_detected else ""))
     print(f"👤 Name Match: {'✅' if name_matching_verified else '❌'} ({final_match_score*100:.1f}%)")
@@ -1422,7 +1413,7 @@ def complete_guest_verification_flow(image_path: str, guest_info: dict,
     license_detected = ("Driver's License Detected" in final_document_status or
                        "Name Match Override" in final_document_status)
 
-    name_matching_verified = final_match_score > 0.65
+    name_matching_verified = final_match_score > 0.85
 
     # If names match, force license detection to be true (same as student/staff)
     if name_matching_verified:
@@ -1435,9 +1426,52 @@ def complete_guest_verification_flow(image_path: str, guest_info: dict,
     print("🎯 GUEST VERIFICATION")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"🪖 Helmet: {'✅' if helmet_verified else '❌'}")
+    print(f"📅 Expiration Date: {license_result.expiration_date or 'Not Found'}")
     print(f"🆔 License Detected: {'✅' if license_detected else '❌'}" +
           (" (Name Match Override)" if name_matching_verified and license_detected else ""))
     print(f"👤 Name Match: {'✅' if name_matching_verified else '❌'} ({final_match_score*100:.1f}%)")
+    print(f"🟢 STATUS: {'✅ GUEST VERIFIED' if guest_verified else '❌ GUEST VERIFICATION FAILED'}")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    return guest_verified
+    
+def verify_guest_license_from_text(ocr_text: str, guest_info: dict, helmet_verified: bool = True) -> bool:
+    """
+    Efficiently verifies a guest license using pre-extracted OCR text.
+    This avoids making redundant API calls.
+    """
+    print("\nVerifying guest license from existing OCR text...")
+    
+    # 1. Extract Expiration Date from the text
+    extracted_date = _extract_expiration_date(ocr_text)
+    
+    # 2. Find the best name match in the text
+    ocr_lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
+    name_from_ocr, sim_score = find_best_line_match(guest_info['name'], ocr_lines)
+
+    # 3. Determine if the document is a license based on keywords
+    keywords_found = _count_verification_keywords(ocr_text)
+    doc_status = "Driver's License Detected" if keywords_found >= 1 else "Document Detected"
+
+    # 4. Final verification checks using the stricter 85% threshold
+    name_matching_verified = sim_score > 0.85
+    license_detected = "Driver's License Detected" in doc_status or name_matching_verified
+    
+    if name_matching_verified:
+        license_detected = True # Name match override
+        print(f"🎯 Guest name match override: License detection forced to TRUE")
+
+    guest_verified = helmet_verified and license_detected
+
+    # Print final results (similar to the old function)
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("🎯 EFFICIENT GUEST VERIFICATION")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"🪖 Helmet: {'✅' if helmet_verified else '❌'}")
+    print(f"📅 Expiration Date: {extracted_date or 'Not Found'}")
+    print(f"🆔 License Detected: {'✅' if license_detected else '❌'}" +
+          (" (Name Match Override)" if name_matching_verified else ""))
+    print(f"👤 Name Match: {'✅' if name_matching_verified else '❌'} ({sim_score*100:.1f}%)")
     print(f"🟢 STATUS: {'✅ GUEST VERIFIED' if guest_verified else '❌ GUEST VERIFICATION FAILED'}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 

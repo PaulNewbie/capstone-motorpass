@@ -49,7 +49,7 @@ from database.db_operations import (
 
 def guest_verification():
     """Main guest verification with GUI"""
-    log_info("GUEST VERIFICATION")
+    log_info("VISITOR VERIFICATION")
     log_info("Opening GUI interface...")
     
     from etc.ui.guest_gui import GuestVerificationGUI
@@ -101,79 +101,55 @@ def _verify_helmet_step(status_callback):
     status_callback({'current_step': MSG_HELMET_VERIFIED})
     log_success("Helmet verification successful")
     return True
+    
 
 
 def _license_capture_and_processing_loop(status_callback):
     """
     Step 2: Main license capture loop.
-    Handles both new guest registration and automatic timeout.
+    REFACTORED to perform OCR only ONCE.
     """
-    while True:
-        # Capture license - NOW WITH CANCEL DETECTION
+    while True:        
+        
+        
         capture_result = _capture_license_step(status_callback)
-        
-        # FIX 1: Handle tuple return for cancellation
-        if isinstance(capture_result, tuple):
-            image_path, reason = capture_result
-        else:
-            image_path = capture_result
-            reason = "success" if capture_result else "unknown"
-        
-        # Check if user cancelled
+        image_path, reason = capture_result if isinstance(capture_result, tuple) else (capture_result, "success")
+
         if not image_path:
             if reason == "cancelled":
                 log_warning("User cancelled license capture")
                 status_callback({'current_step': '❌ License capture cancelled'})
-                return handle_verification_failure(
-                    status_callback,
-                    'License capture cancelled by user'
-                )
-            else:
-                return handle_verification_failure(
-                    status_callback, 
-                    'License capture failed'
-                )
-        
-        status_callback({'license_status': 'DETECTED'})
-        
-        # Extract and verify name
-        status_callback({'current_step': '🔍 Processing license information...'})
-        
-        # Check for Student Permit
-        if _check_student_permit(image_path, status_callback):
-            cleanup_image_file(image_path)
-            return handle_student_permit_denied(status_callback)
-        
-        # Extract name
-        detected_name = _extract_name_from_license(image_path)
+            return handle_verification_failure(status_callback, 'License capture failed or cancelled')
+
+        status_callback({'license_status': 'DETECTED', 'current_step': '🔍 Processing license information...'})
+
+        # =================== THE FIX: OCR ONCE ===================
+        try:
+            # This is now the ONLY place an API call is made for OCR
+            ocr_text = extract_text_from_image(image_path)
+        except ValueError as e:
+            if "STUDENT_PERMIT_DETECTED" in str(e):
+                cleanup_image_file(image_path)
+                return handle_student_permit_denied(status_callback)
+            return handle_verification_failure(status_callback, f'OCR Error: {e}')
+        # =========================================================
+
+        ocr_lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
+        detected_name = extract_guest_name_from_license(ocr_lines)
         log_info(f"Detected name: {detected_name}")
         
-        # Check if student/staff trying to enter as guest
         if _check_if_student_or_staff(detected_name, image_path, status_callback):
             cleanup_image_file(image_path)
-            return handle_verification_failure(
-                status_callback,
-                'Student/Staff not allowed as visitors'
-            )
-        
-        # Check guest status
+            return handle_verification_failure(status_callback, 'Student/Staff not allowed as visitors')
+
         current_status, guest_info = get_guest_time_status(detected_name)
         
         if current_status == 'IN':
-            # Automatic timeout for existing guest
-            return _handle_automatic_timeout(
-                detected_name, 
-                guest_info, 
-                image_path, 
-                status_callback
-            )
+            # PASS ocr_text to the timeout handler
+            return _handle_automatic_timeout(detected_name, guest_info, image_path, ocr_text, status_callback)
         else:
-            # New guest registration
-            return _handle_new_guest_registration(
-                detected_name, 
-                image_path, 
-                status_callback
-            )
+            # PASS ocr_text to the registration handler
+            return _handle_new_guest_registration(detected_name, image_path, ocr_text, status_callback)
 
 
 def _capture_license_step(status_callback):
@@ -249,7 +225,7 @@ def _check_if_student_or_staff(detected_name, image_path, status_callback):
     
     return False
 
-def _handle_automatic_timeout(detected_name, guest_info, image_path, status_callback):
+def _handle_automatic_timeout(detected_name, guest_info, image_path, ocr_text, status_callback):
     """Handle automatic timeout for guest already in system"""
     log_info(f"Guest '{detected_name}' already IN - Processing automatic TIMEOUT")
     
@@ -329,18 +305,13 @@ def _process_guest_timeout(guest_info, image_path, status_callback):
             'Failed to record TIME OUT'
         )
         
-def _handle_new_guest_registration(detected_name, image_path, status_callback):
-    """Handle registration flow for new guests"""
+def _handle_new_guest_registration(detected_name, image_path, ocr_text, status_callback):
+    """Handle registration flow for new guests, now passing ocr_text"""
     status_callback({
-        'guest_info': {
-            'name': detected_name if detected_name != "Guest" else "New Guest",
-            'status': 'NEW GUEST - REGISTRATION'
-        }
+        'guest_info': {'name': detected_name if detected_name != "Guest" else "New Guest", 'status': 'NEW GUEST - REGISTRATION'}
     })
-    
     status_callback({'current_step': '🔍 Please provide guest information...'})
-    
-    # Get guest info with retake functionality
+
     while True:
         guest_info_input = get_guest_info_gui(detected_name)
         
@@ -348,56 +319,37 @@ def _handle_new_guest_registration(detected_name, image_path, status_callback):
             log_info("User requested license retake from registration form")
             status_callback({'current_step': '📄 Retaking license scan...'})
             cleanup_image_file(image_path)
-            # Return to license capture
             return _license_capture_and_processing_loop(status_callback)
         
-        elif not guest_info_input:
-            # User cancelled
+        if not guest_info_input:
             status_callback({'current_step': '❌ Guest registration cancelled'})
             cleanup_image_file(image_path)
-            return handle_verification_failure(
-                status_callback,
-                'Guest registration cancelled'
-            )
-        
-        # The manual input is the authoritative source
-        return _process_new_guest_time_in(
-            guest_info_input,  # This contains the manually entered name
-            image_path, 
-            status_callback
-        )
+            return handle_verification_failure(status_callback, 'Guest registration cancelled')
+
+        # PASS ocr_text to the final processing step
+        return _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_callback)
 
 
-def _process_new_guest_time_in(guest_info_input, image_path, status_callback):
-    """Process time in for new guest"""
-    # FIX 2: Use the manually entered name from guest_info_input
+def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_callback):
+    """Process time in for new guest using the pre-fetched ocr_text"""
     manual_name = guest_info_input['name']
-    
     status_callback({
-        'guest_info': {
-            'name': manual_name,  # Use manual input name
-            'plate_number': guest_info_input['plate_number'],
-            'office': guest_info_input['office'],
-            'status': 'NEW GUEST - PROCESSING'
-        }
+        'guest_info': {'name': manual_name, 'plate_number': guest_info_input['plate_number'], 'office': guest_info_input['office'], 'status': 'NEW GUEST - PROCESSING'},
+        'current_step': '🔍 Processing guest time in...'
     })
-    
-    status_callback({'current_step': '🔍 Processing guest time in...'})
-    
-    # FIX 2: Use manual name for verification, not detected name
+
     guest_data_for_license = {
-        'name': manual_name,  # Use manual input name
+        'name': manual_name,
         'plate_number': guest_info_input['plate_number'],
         'office': guest_info_input['office'],
         'is_guest': True
     }
-    
     log_info(f"Using manually entered name: {manual_name}")
     
     # Verify license with MANUAL NAME (not detected name)
     try:
-        is_guest_verified = complete_guest_verification_flow(
-            image_path=image_path,
+        is_guest_verified = verify_guest_license_from_text(
+            ocr_text=ocr_text,
             guest_info=guest_data_for_license,
             helmet_verified=True
         )
@@ -473,7 +425,7 @@ def check_if_student_or_staff_name(name):
     if not name or name == "Guest":
         return False, None
     
-    SIMILARITY_THRESHOLD = 0.70
+    SIMILARITY_THRESHOLD = 0.85
     
     # Check students
     try:
