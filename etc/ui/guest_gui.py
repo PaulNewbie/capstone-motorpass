@@ -465,33 +465,33 @@ class GuestVerificationGUI:
         try:
             self.verification_complete = True
             
-            # Clean, centered result card with golden background
-            card_width = 600
-            card_height = 400
+            # Increased card size for better readability
+            card_width = 800
+            card_height = 500
             
             # Create card with golden background and raised border
-            result_card = tk.Frame(self.root, bg='#FFD700', relief='raised', bd=4)
+            result_card = tk.Frame(self.root, bg='#FFD700', relief='raised', bd=5)
             result_card.place(relx=0.5, rely=0.5, anchor='center', 
                              width=card_width, height=card_height)
             
             # Inner content area with padding
             content = tk.Frame(result_card, bg='#FFD700')
-            content.pack(fill='both', expand=True, padx=20, pady=20)
+            content.pack(fill='both', expand=True, padx=30, pady=25)
             
             if result.get('verified', False):
                 # ===== SUCCESS LAYOUT =====
                 
                 # Success icon
                 icon_label = tk.Label(content, text="✓", 
-                                    font=("Arial", 80, "bold"), 
+                                    font=("Arial", 90, "bold"), 
                                     fg="#4CAF50", bg='#FFD700')
-                icon_label.pack(pady=(40, 20))
+                icon_label.pack(pady=(20, 15))
                 
                 # Title
                 title = tk.Label(content, text="Verification Successful", 
-                               font=("Arial", 28, "bold"), 
+                               font=("Arial", 32, "bold"), 
                                fg="#2E7D32", bg='#FFD700')
-                title.pack(pady=(0, 25))
+                title.pack(pady=(0, 20))
                 
                 # Format name
                 name = result.get('name', 'Visitor')
@@ -500,25 +500,28 @@ class GuestVerificationGUI:
                     if len(parts) >= 2:
                         name = f"{parts[1].strip()} {parts[0].strip()}"
                 
-                # Welcome message
+                # Welcome message with word wrapping
                 welcome = tk.Label(content, text=f"Welcome, {name}", 
-                                 font=("Arial", 20), 
-                                 fg="#333333", bg='#FFD700')
-                welcome.pack(pady=(0, 15))
+                                 font=("Arial", 22), 
+                                 fg="#333333", bg='#FFD700',
+                                 wraplength=card_width - 80) # Wraps text if name is too long
+                welcome.pack(pady=(0, 20))
                 
                 # Visitor info box (plate number and office)
-                info_frame = tk.Frame(content, bg='#E8F5E9', bd=0)
-                info_frame.pack(pady=(10, 0), padx=40, fill='x')
+                info_frame = tk.Frame(content, bg='#E8F5E9', bd=1, relief='solid')
+                info_frame.pack(pady=(15, 0), padx=40, fill='x')
                 
                 plate = result.get('plate_number', 'N/A')
                 office = result.get('office', 'N/A')
+                expiration_date = result.get('expiration_date', 'N/A')
                 
-                info_text = f"🚗 Plate: {plate}\n🏢 Visiting: {office}"
+                # Added more space between Plate No. and Visiting
+                info_text = f"Plate No: {plate}   |   Visiting: {office}\nLicense Expires: {expiration_date}"
                 info_label = tk.Label(info_frame, 
                                     text=info_text, 
-                                    font=("Arial", 14), 
+                                    font=("Arial", 16), 
                                     fg="#1B5E20", bg='#E8F5E9',
-                                    pady=12,
+                                    pady=15,
                                     justify='center')
                 info_label.pack()
                 
@@ -527,45 +530,45 @@ class GuestVerificationGUI:
                 
                 # Error icon
                 icon_label = tk.Label(content, text="✕", 
-                                    font=("Arial", 80, "bold"), 
+                                    font=("Arial", 90, "bold"), 
                                     fg="#F44336", bg='#FFD700')
-                icon_label.pack(pady=(40, 20))
+                icon_label.pack(pady=(20, 15))
                 
                 # Title
                 title = tk.Label(content, text="Verification Failed", 
-                               font=("Arial", 28, "bold"), 
+                               font=("Arial", 32, "bold"), 
                                fg="#C62828", bg='#FFD700')
-                title.pack(pady=(0, 30))
+                title.pack(pady=(0, 25))
                 
                 # Error message box
-                error_frame = tk.Frame(content, bg='#FFEBEE', bd=0)
-                error_frame.pack(pady=(0, 20), padx=50, fill='x')
+                error_frame = tk.Frame(content, bg='#FFEBEE', bd=1, relief='solid')
+                error_frame.pack(pady=(0, 20), padx=40, fill='x')
                 
                 reason_text = result.get('reason', 'Unknown error')
                 reason = tk.Label(error_frame, 
                                 text=reason_text, 
                                 font=("Arial", 16), 
                                 fg="#C62828", bg='#FFEBEE',
-                                wraplength=480,
+                                wraplength=card_width - 100,
                                 justify='center',
-                                pady=15)
+                                pady=20)
                 reason.pack()
                 
                 # Help text
                 help_text = tk.Label(content, 
-                                   text="Please contact security if you need assistance", 
-                                   font=("Arial", 12), 
+                                   text="Please contact security for assistance.", 
+                                   font=("Arial", 14), 
                                    fg="#757575", bg='#FFD700')
-                help_text.pack(pady=(10, 0))
+                help_text.pack(pady=(15, 0))
             
-            # Auto close with timing
-            close_delay = 4000 if result.get('verified', False) else 5000
+            # Auto close with a 4-second delay
+            close_delay = 4000
             self.root.after(close_delay, self.close)
             
         except Exception as e:
             print(f"Error showing final result: {e}")
             self.close()
-             
+                                  
     def update_status(self, updates):
         """Update status from verification thread"""
         try:

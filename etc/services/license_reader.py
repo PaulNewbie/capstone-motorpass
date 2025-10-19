@@ -23,7 +23,7 @@ from etc.services.hardware.led_control import set_led_white_lighting
 # ============== CONFIGURATION ==============
 
 # --- Online OCR Configuration ---
-OCR_SPACE_API_KEY = 'K85152276488957'  # Your API key from ocr_project/final_test.py
+OCR_SPACE_API_KEY = 'K86208907288957'  # Your API key from ocr_project/final_test.py
 OCR_SPACE_URL = 'https://api.ocr.space/parse/image'
 
 # --- Offline OCR Configuration ---
@@ -1151,7 +1151,7 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
             elif key == ord("s"):
                 # Manual capture with current enhancement level
                 if roi_enhancement_level > 1.2:
-                    captured_frame = cv2.convertScaleAbs(frame, alpha=roi_enhancement_level, beta=30)
+                    captured_.frame = cv2.convertScaleAbs(frame, alpha=roi_enhancement_level, beta=30)
                 else:
                     captured_frame = cv2.convertScaleAbs(frame, alpha=1.2, beta=20)
                 break
