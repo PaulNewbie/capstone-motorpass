@@ -1,5 +1,3 @@
-# controllers/guest.py - FINAL FIXED: Cancel + Manual name + Correct function calls
-
 from etc.services.license_reader import *
 from etc.services.helmet_infer import verify_helmet
 from etc.services.hardware.led_control import *
@@ -48,42 +46,43 @@ from etc.services.license_reader import _extract_expiration_date
 
 
 # ============================================================================
-#                          MAIN ENTRY POINTS
+#                         MAIN ENTRY POINTS
 # ============================================================================
 
 def guest_verification():
-    """Main visitor verification with GUI"""
-    log_info("VISITOR VERIFICATION")
-    log_info("Opening GUI interface...")
-
-    from etc.ui.guest_gui import GuestVerificationGUI
-
-    gui = GuestVerificationGUI(run_guest_verification_with_gui)
-    gui.run()
-
-
-def run_guest_verification_with_gui(status_callback):
     """
-    Simplified visitor verification with automatic timeout.
-    Refactored to use step functions for clarity.
+    Main entry point for the guest verification process.
+    Launches the GuestVerificationGUI.
     """
-    # Initialize systems
-    init_buzzer()
-    set_led_processing()
-    play_processing()
+    try:
+        from etc.ui.guest_gui import GuestVerificationGUI
+        
+        gui = GuestVerificationGUI(verification_function=_run_guest_verification_with_cleanup)
+        gui.run()
 
-    # Step 1: Helmet verification
-    if not _verify_helmet_step(status_callback):
-        return handle_verification_failure(
-            status_callback,
-            'Helmet verification failed'
-        )
+    except Exception as e:
+        print(f"❌ An unexpected error occurred in guest verification: {e}")
+    finally:
+        print("🏁 Closing guest verification process...")
 
-    # Step 2: License capture and processing loop
-    return _license_capture_and_processing_loop(status_callback)
+
+def _run_guest_verification_with_cleanup(status_callback):
+    """
+    Wraps the entire verification flow to ensure camera cleanup happens,
+    even if the process is exited early.
+    """
+    try:
+        if not _verify_helmet_step(status_callback):
+            return {'verified': False, 'reason': MSG_HELMET_FAILED}
+        
+        return _license_capture_and_processing_loop(status_callback)
+    finally:
+        # A final, failsafe cleanup call when the entire thread finishes
+        print("🧹 Final cleanup from guest verification thread...")
+        force_camera_cleanup()
 
 # ============================================================================
-#                          STEP FUNCTIONS
+#                         STEP FUNCTIONS
 # ============================================================================
 
 def _verify_helmet_step(status_callback):
@@ -96,26 +95,18 @@ def _verify_helmet_step(status_callback):
     print(SEPARATOR_LONG)
 
     if not verify_helmet():
-        status_callback({'helmet_status': 'FAILED'})
-        status_callback({'current_step': MSG_HELMET_FAILED})
+        status_callback({'helmet_status': 'FAILED', 'current_step': MSG_HELMET_FAILED})
         log_error("Helmet verification failed")
         return False
 
-    status_callback({'helmet_status': 'VERIFIED'})
-    status_callback({'current_step': MSG_HELMET_VERIFIED})
+    status_callback({'helmet_status': 'VERIFIED', 'current_step': MSG_HELMET_VERIFIED})
     log_success("Helmet verification successful")
     return True
 
-
-
 def _license_capture_and_processing_loop(status_callback):
-    """
-    Step 2: Main license capture loop.
-    REFACTORED to perform OCR only ONCE.
-    """
+    """ Step 2: Main license capture loop. """
+    # This loop structure is part of your original design for retakes
     while True:
-
-
         capture_result = _capture_license_step(status_callback)
         image_path, reason = capture_result if isinstance(capture_result, tuple) else (capture_result, "success")
 
@@ -127,9 +118,7 @@ def _license_capture_and_processing_loop(status_callback):
 
         status_callback({'license_status': 'DETECTED', 'current_step': '🔍 Processing license information...'})
 
-        # =================== THE FIX: OCR ONCE ===================
         try:
-            # This is now the ONLY place an API call is made for OCR
             ocr_text = extract_text_from_image(image_path)
             expiration_date = _extract_expiration_date(ocr_text)
 
@@ -141,14 +130,12 @@ def _license_capture_and_processing_loop(status_callback):
                     log_error(f"Guest license expired {days_overdue} days ago.")
                     cleanup_image_file(image_path)
                     return handle_expired_license(status_callback, {"name": "Guest"}, days_overdue)
-
         except ValueError as e:
             if "STUDENT_PERMIT_DETECTED" in str(e):
                 cleanup_image_file(image_path)
                 return handle_student_permit_denied(status_callback)
             return handle_verification_failure(status_callback, f'OCR Error: {e}')
-        # =========================================================
-
+        
         ocr_lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
         detected_name = extract_guest_name_from_license(ocr_lines)
         log_info(f"Detected name: {detected_name}")
@@ -160,13 +147,42 @@ def _license_capture_and_processing_loop(status_callback):
         current_status, guest_info = get_guest_time_status(detected_name)
 
         if current_status == 'IN':
-            # PASS ocr_text to the timeout handler
             return _handle_automatic_timeout(detected_name, guest_info, image_path, ocr_text, status_callback)
         else:
-            # PASS ocr_text to the registration handler
             return _handle_new_guest_registration(detected_name, image_path, ocr_text, status_callback)
 
 
+def _handle_new_guest_registration(detected_name, image_path, ocr_text, status_callback):
+    """Handle registration flow for new visitors, now passing ocr_text"""
+    status_callback({
+        'guest_info': {'name': detected_name if detected_name != "Visitor" else "New Visitor", 'status': 'NEW VISITOR - REGISTRATION'}
+    })
+    status_callback({'current_step': '🔍 Please provide visitor information...'})
+
+    # --- THIS IS THE FIX ---
+    # We are about to open a new Tkinter window (get_guest_info_gui).
+    # We MUST close the OpenCV camera window first to release the "grab".
+    print("🧹 Cleaning up camera before showing registration dialog...")
+    force_camera_cleanup()
+    # -----------------------
+
+    while True:
+        guest_info_input = get_guest_info_gui(detected_name)
+
+        if guest_info_input == 'retake':
+            log_info("User requested license retake from registration form")
+            status_callback({'current_step': '📄 Retaking license scan...'})
+            cleanup_image_file(image_path)
+            # By returning here, we allow the main loop to run again, which is correct.
+            return _license_capture_and_processing_loop(status_callback)
+
+        if not guest_info_input:
+            status_callback({'current_step': '❌ Visitor registration cancelled'})
+            cleanup_image_file(image_path)
+            return handle_verification_failure(status_callback, 'Visitor registration cancelled')
+
+        # If the user provided info, process it and exit the loop.
+        return _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_callback)
 def _capture_license_step(status_callback):
     """Step 2a: Capture license with cancel detection"""
     status_callback({'current_step': '📄 Capturing license... (Check terminal for camera)'})
@@ -329,31 +345,6 @@ def _process_guest_timeout(guest_info, image_path, ocr_text, status_callback):
             status_callback,
             'Failed to record TIME OUT'
         )
-
-def _handle_new_guest_registration(detected_name, image_path, ocr_text, status_callback):
-    """Handle registration flow for new visitors, now passing ocr_text"""
-    status_callback({
-        'guest_info': {'name': detected_name if detected_name != "Visitor" else "New Visitor", 'status': 'NEW VISITOR - REGISTRATION'}
-    })
-    status_callback({'current_step': '🔍 Please provide visitor information...'})
-
-    while True:
-        guest_info_input = get_guest_info_gui(detected_name)
-
-        if guest_info_input == 'retake':
-            log_info("User requested license retake from registration form")
-            status_callback({'current_step': '📄 Retaking license scan...'})
-            cleanup_image_file(image_path)
-            return _license_capture_and_processing_loop(status_callback)
-
-        if not guest_info_input:
-            status_callback({'current_step': '❌ Visitor registration cancelled'})
-            cleanup_image_file(image_path)
-            return handle_verification_failure(status_callback, 'Visitor registration cancelled')
-
-        # PASS ocr_text to the final processing step
-        return _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_callback)
-
 
 def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_callback):
     """Process time in for new visitor using the pre-fetched ocr_text"""

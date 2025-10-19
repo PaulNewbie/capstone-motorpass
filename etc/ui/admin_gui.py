@@ -1375,9 +1375,9 @@ class AdminPanelGUI:
             
             # Cards data
             cards_data = [
-                ("👤", "Enroll New User", "Register student/staff with fingerprint", self.enroll_user, self.colors['success'], "enroll"),
+                ("👤", "Register New User", "Register student/staff with fingerprint", self.enroll_user, self.colors['success'], "enroll"),
                 ("👥", "View Users", "Display all registered users", self.view_users, self.colors['info'], "view_users"),
-                ("🗑️", "Delete User", "Remove user fingerprint", self.delete_user, self.colors['accent'], "delete_fingerprint"),
+                ("🗑️", "Update User", "Remove user fingerprint", self.delete_user, self.colors['accent'], "delete_fingerprint"),
                 ("🔄", "Sync Database", "Import from Google Sheets", self.sync_database, self.colors['warning'], "sync"),
                 ("🕒", "Time Records", "View attendance history", self.view_time_records, self.colors['secondary'], "get_time_records"),
                 ("🧹", "Clear Records", "Delete time records", self.clear_time_records, self.colors['dark'], "clear_records"),

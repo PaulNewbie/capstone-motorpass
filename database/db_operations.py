@@ -1,4 +1,4 @@
-# database/db_operations.py - FIXED Firebase integration
+# database/db_operations.py - FINAL version with all necessary functions
 
 import sqlite3
 import os
@@ -9,9 +9,9 @@ from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 from database.init_database import MOTORPASS_DB, initialize_all_databases, get_database_stats
 
-# FIXED: Import Firebase helper instead of direct import
 from etc.utils.firebase_helper import sync_guest_to_firebase, sync_time_to_firebase, check_firebase_status
 
+# ... (all of your existing functions from add_student to get_student_by_fingerprint_id remain here) ...
 # =================== STUDENT OPERATIONS ===================
 
 def add_student(student_data: Dict) -> bool:
@@ -38,7 +38,6 @@ def add_student(student_data: Dict) -> bool:
         conn.commit()
         conn.close()
         
-        # FIXED: Safe Firebase sync
         try:
             from etc.utils.firebase_helper import safe_firebase_sync
             safe_firebase_sync('add_student', 
@@ -49,7 +48,7 @@ def add_student(student_data: Dict) -> bool:
                 student_data.get('plate_number')
             )
         except:
-            pass  # Don't fail if Firebase isn't available
+            pass
         
         return True
         
@@ -147,7 +146,6 @@ def add_staff(staff_data: Dict) -> bool:
         conn.commit()
         conn.close()
         
-        # FIXED: Safe Firebase sync
         try:
             from etc.utils.firebase_helper import safe_firebase_sync
             safe_firebase_sync('add_staff',
@@ -158,7 +156,7 @@ def add_staff(staff_data: Dict) -> bool:
                 staff_data.get('plate_number')
             )
         except:
-            pass  # Don't fail if Firebase isn't available
+            pass
         
         return True
         
@@ -229,6 +227,104 @@ def get_all_staff() -> List[Dict]:
     except sqlite3.Error as e:
         print(f"❌ Error fetching staff: {e}")
         return []
+
+def get_student_by_fingerprint_id(fingerprint_slot: int) -> Optional[Dict]:
+    """Get a student or staff member by their fingerprint slot ID."""
+    try:
+        conn = sqlite3.connect(MOTORPASS_DB)
+        cursor = conn.cursor()
+
+        # Check students table
+        cursor.execute('''
+            SELECT student_id, full_name, course, license_number,
+                   license_expiration, plate_number, fingerprint_slot
+            FROM students WHERE fingerprint_slot = ?
+        ''', (fingerprint_slot,))
+        row = cursor.fetchone()
+        if row:
+            conn.close()
+            return {
+                'unified_id': row[0],
+                'student_id': row[0],
+                'name': row[1],
+                'full_name': row[1],
+                'course': row[2],
+                'license_number': row[3],
+                'license_expiration': row[4],
+                'plate_number': row[5],
+                'fingerprint_slot': row[6],
+                'user_type': 'STUDENT'
+            }
+
+        # Check staff table
+        cursor.execute('''
+            SELECT staff_no, full_name, staff_role, license_number,
+                   license_expiration, plate_number, fingerprint_slot
+            FROM staff WHERE fingerprint_slot = ?
+        ''', (fingerprint_slot,))
+        row = cursor.fetchone()
+        if row:
+            conn.close()
+            return {
+                'unified_id': row[0],
+                'staff_no': row[0],
+                'name': row[1],
+                'full_name': row[1],
+                'staff_role': row[2],
+                'license_number': row[3],
+                'license_expiration': row[4],
+                'plate_number': row[5],
+                'fingerprint_slot': row[6],
+                'user_type': 'STAFF'
+            }
+
+        conn.close()
+        return None
+
+    except sqlite3.Error as e:
+        print(f"❌ Error fetching user by fingerprint slot: {e}")
+        return None
+        
+# =================== NEWLY ADDED COMPATIBILITY FUNCTIONS ===================
+
+def record_time_log(user_id, user_name, action, timestamp):
+    """
+    A compatibility function that logs time IN or OUT based on the 'action'.
+    This is what the student controller will call.
+    """
+    # We need to create a user_info dictionary that record_time_in/out expects
+    user_type = "STUDENT" # Default, can be improved if needed
+    if "STAFF" in user_id.upper():
+        user_type = "STAFF"
+    elif "GUEST" in user_id.upper():
+        user_type = "GUEST"
+
+    user_info = {
+        'unified_id': user_id, 
+        'name': user_name, 
+        'user_type': user_type
+    }
+    
+    if action.upper() == 'IN':
+        return record_time_in(user_info)
+    elif action.upper() == 'OUT':
+        return record_time_out(user_info)
+    
+    print(f"❌ Unknown action '{action}' for record_time_log")
+    return False
+
+def get_last_log_action(user_id: str) -> Optional[str]:
+    """
+    Gets the last recorded action (IN/OUT) for a given user.
+    This is an alias for get_student_time_status for compatibility.
+    """
+    return get_student_time_status(user_id)
+
+def is_user_already_in(user_id: str) -> bool:
+    """
+    Checks if the user's current status is 'IN'.
+    """
+    return get_student_time_status(user_id) == 'IN'
 
 # =================== GUEST OPERATIONS ===================
 

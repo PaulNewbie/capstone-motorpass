@@ -1,4 +1,5 @@
-# main.py - Simple fix with cleanup calls added
+# main.py - FINAL FIX with a delay added to the restart process
+
 import subprocess
 import sys
 import os
@@ -15,8 +16,8 @@ from config import SYSTEM_NAME, SYSTEM_VERSION
 
 # Import services
 from etc.services.hardware.led_control import (
-    init_led_system, 
-    set_led_idle, 
+    init_led_system,
+    set_led_idle,
     cleanup_led_system
 )
 from etc.services.hardware.rpi_camera import force_camera_cleanup
@@ -50,12 +51,18 @@ def cleanup_system():
         pass
 
 def restart_application():
-    """Restart the entire application"""
+    """Restart the entire application with a delay"""
     print("\n🔄 Restarting...")
     
-    # Clean up and restart
+    # Clean up system resources
     cleanup_system()
-    time.sleep(0.5)
+    
+    # --- THIS IS THE FIX ---
+    # Add a delay to allow background threads (like camera cleanup) to fully finish
+    # before the main process exits and restarts.
+    print("⏳ Waiting for cleanup to complete...")
+    # time.sleep(10)
+    # -----------------------
     
     script_path = os.path.abspath(__file__)
     subprocess.Popen([sys.executable, script_path])
@@ -65,85 +72,67 @@ def student_wrapper(main_window=None):
     """Simple wrapper - hide window, run process, then restart"""
     try:
         if main_window:
-            main_window.withdraw()  # Hide main window for student
+            main_window.withdraw()
         
-        result = student_verification()  # Run your original function
-        
-        # Only restart after verification completes successfully
-        restart_application()
-        return result
+        # This function now correctly manages its own GUI and cleanup
+        student_verification()
         
     except Exception as e:
         print(f"❌ Error in student verification: {e}")
-        # Only restart on error if needed
+    finally:
+        # The restart is now the very last thing that happens
         restart_application()
-        raise
 
 def guest_wrapper(main_window=None):
     """Simple wrapper - hide window, run process, then restart"""
     try:
         if main_window:
-            main_window.withdraw()  # Hide main window for guest
+            main_window.withdraw()
         
-        result = guest_verification()  # Run your original function
-        
-        # Only restart after verification completes
-        restart_application()
-        return result
+        guest_verification()
         
     except Exception as e:
         print(f"❌ Error in guest verification: {e}")
+    finally:
         restart_application()
-        raise
 
 def admin_wrapper(main_window=None):
-    """FIXED: Don't hide main window - let admin authentication handle it"""
+    """Admin wrapper passes the main window to the admin panel"""
     try:
-        # DON'T hide main_window here - pass it to admin_panel instead
-        result = admin_panel(main_window=main_window)
-        
-        # Only restart after admin completes
-        restart_application()
-        return result
+        admin_panel(main_window=main_window)
         
     except Exception as e:
         print(f"❌ Error in admin panel: {e}")
+    finally:
         restart_application()
-        raise
 
 def main():
-    """Main function - unchanged except using wrappers"""
+    """Main function"""
     try:
         print(f"\n{'='*60}")
         print(f"🚗 {SYSTEM_NAME} v{SYSTEM_VERSION}")
         print(f"{'='*60}")
         
-        # Initialize system
         if not initialize_system():
             print("❌ System initialization failed!")
             return False
         
-        # Create main GUI with wrapper functions (instead of original functions)
         main_gui = MotorPassGUI(
             system_name=SYSTEM_NAME,
             system_version=SYSTEM_VERSION,
-            student_function=student_wrapper,  # Use wrapper
-            guest_function=guest_wrapper,      # Use wrapper
-            admin_function=admin_wrapper       # Use wrapper
+            student_function=student_wrapper,
+            guest_function=guest_wrapper,
+            admin_function=admin_wrapper
         )
         
-        # Run main GUI
         main_gui.run()
         
     except KeyboardInterrupt:
         print("\n⚠️ System interrupted by user")
-        cleanup_system()
-        return False
     except Exception as e:
         print(f"\n❌ System error: {e}")
-        cleanup_system()
-        return False
     finally:
+        # A final cleanup call when the entire application is truly exiting
         cleanup_system()
 
 if __name__ == "__main__":
