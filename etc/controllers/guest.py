@@ -2,7 +2,7 @@
 
 from etc.services.license_reader import *
 from etc.services.helmet_infer import verify_helmet
-from etc.services.hardware.led_control import *  
+from etc.services.hardware.led_control import * 
 from etc.services.hardware.buzzer_control import *
 from etc.services.hardware.rpi_camera import force_camera_cleanup
 from etc.utils.display_helpers import display_separator, display_verification_result
@@ -48,7 +48,7 @@ from database.db_operations import (
 # ============================================================================
 
 def guest_verification():
-    """Main guest verification with GUI"""
+    """Main visitor verification with GUI"""
     log_info("VISITOR VERIFICATION")
     log_info("Opening GUI interface...")
     
@@ -60,7 +60,7 @@ def guest_verification():
 
 def run_guest_verification_with_gui(status_callback):
     """
-    Simplified guest verification with automatic timeout.
+    Simplified visitor verification with automatic timeout.
     Refactored to use step functions for clarity.
     """
     # Initialize systems
@@ -205,7 +205,7 @@ def _check_student_permit(image_path, status_callback):
 
 
 def _extract_name_from_license(image_path):
-    """Extract guest name from license OCR"""
+    """Extract visitor name from license OCR"""
     ocr_preview = extract_text_from_image(image_path)
     ocr_lines = [line.strip() for line in ocr_preview.splitlines() if line.strip()]
     return extract_guest_name_from_license(ocr_lines)
@@ -226,10 +226,10 @@ def _check_if_student_or_staff(detected_name, image_path, status_callback):
     return False
 
 def _handle_automatic_timeout(detected_name, guest_info, image_path, ocr_text, status_callback):
-    """Handle automatic timeout for guest already in system"""
-    log_info(f"Guest '{detected_name}' already IN - Processing automatic TIMEOUT")
+    """Handle automatic timeout for visitor already in system"""
+    log_info(f"Visitor '{detected_name}' already IN - Processing automatic TIMEOUT")
     
-    # Extract guest information
+    # Extract visitor information
     guest_name = guest_info.get('name', detected_name)
     guest_plate = guest_info.get('plate_number', 'N/A')
     guest_office = guest_info.get('office', 'N/A')
@@ -263,7 +263,7 @@ def _handle_automatic_timeout(detected_name, guest_info, image_path, ocr_text, s
 
 
 def _process_guest_timeout(guest_info, image_path, status_callback):
-    """Process guest timeout after security verification"""
+    """Process visitor timeout after security verification"""
     status_callback({'current_step': '📝 Recording TIME OUT...'})
     
     time_result = process_guest_time_out(guest_info)
@@ -285,12 +285,12 @@ def _process_guest_timeout(guest_info, image_path, status_callback):
         cleanup_buzzer()
         cleanup_image_file(image_path)
         
-        # FIX: Return complete guest information in success result
+        # FIX: Return complete visitor information in success result
         return {
             'verified': True,
-            'name': guest_info.get('name', 'Guest'),
+            'name': guest_info.get('name', 'Visitor'),
             'student_id': guest_info.get('guest_number', guest_info.get('plate_number', 'N/A')),
-            'user_type': 'GUEST',
+            'user_type': 'VISITOR',
             'time_action': 'OUT',
             'timestamp': timestamp,
             'plate_number': guest_info.get('plate_number', 'N/A'),
@@ -306,11 +306,11 @@ def _process_guest_timeout(guest_info, image_path, status_callback):
         )
         
 def _handle_new_guest_registration(detected_name, image_path, ocr_text, status_callback):
-    """Handle registration flow for new guests, now passing ocr_text"""
+    """Handle registration flow for new visitors, now passing ocr_text"""
     status_callback({
-        'guest_info': {'name': detected_name if detected_name != "Guest" else "New Guest", 'status': 'NEW GUEST - REGISTRATION'}
+        'guest_info': {'name': detected_name if detected_name != "Visitor" else "New Visitor", 'status': 'NEW VISITOR - REGISTRATION'}
     })
-    status_callback({'current_step': '🔍 Please provide guest information...'})
+    status_callback({'current_step': '🔍 Please provide visitor information...'})
 
     while True:
         guest_info_input = get_guest_info_gui(detected_name)
@@ -322,20 +322,20 @@ def _handle_new_guest_registration(detected_name, image_path, ocr_text, status_c
             return _license_capture_and_processing_loop(status_callback)
         
         if not guest_info_input:
-            status_callback({'current_step': '❌ Guest registration cancelled'})
+            status_callback({'current_step': '❌ Visitor registration cancelled'})
             cleanup_image_file(image_path)
-            return handle_verification_failure(status_callback, 'Guest registration cancelled')
+            return handle_verification_failure(status_callback, 'Visitor registration cancelled')
 
         # PASS ocr_text to the final processing step
         return _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_callback)
 
 
 def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_callback):
-    """Process time in for new guest using the pre-fetched ocr_text"""
+    """Process time in for new visitor using the pre-fetched ocr_text"""
     manual_name = guest_info_input['name']
     status_callback({
-        'guest_info': {'name': manual_name, 'plate_number': guest_info_input['plate_number'], 'office': guest_info_input['office'], 'status': 'NEW GUEST - PROCESSING'},
-        'current_step': '🔍 Processing guest time in...'
+        'guest_info': {'name': manual_name, 'plate_number': guest_info_input['plate_number'], 'office': guest_info_input['office'], 'status': 'NEW VISITOR - PROCESSING'},
+        'current_step': '🔍 Processing visitor time in...'
     })
 
     guest_data_for_license = {
@@ -361,7 +361,7 @@ def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_ca
         raise e
     
     if is_guest_verified:
-        # Store guest and process time in - using MANUAL NAME
+        # Store visitor and process time in - using MANUAL NAME
         store_guest_in_database(guest_info_input)  # Already has manual name
         time_result = process_guest_time_in(guest_info_input)  # Already has manual name
         
@@ -386,7 +386,7 @@ def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_ca
             guest_user_info = {
                 'name': manual_name,
                 'student_id': guest_info_input.get('plate_number', 'N/A'),
-                'user_type': 'GUEST'
+                'user_type': 'VISITOR'
             }
             
             # --- START OF THE FIX ---
@@ -407,7 +407,7 @@ def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_ca
                 'Failed to record TIME IN'
             )
     else:
-        status_callback({'current_step': '❌ Guest verification failed'})
+        status_callback({'current_step': '❌ Visitor verification failed'})
         cleanup_image_file(image_path)
         return handle_verification_failure(
             status_callback,
@@ -422,7 +422,7 @@ def check_if_student_or_staff_name(name):
     except ImportError:
         return False, None
     
-    if not name or name == "Guest":
+    if not name or name == "Visitor":
         return False, None
     
     SIMILARITY_THRESHOLD = 0.85
@@ -469,7 +469,7 @@ def check_if_student_or_staff_name(name):
 
 
 def store_guest_in_database(guest_info):
-    """Store guest with safe Firebase sync"""
+    """Store visitor with safe Firebase sync"""
     try:
         guest_data = {
             'full_name': guest_info['name'],
@@ -480,7 +480,7 @@ def store_guest_in_database(guest_info):
         guest_number = add_guest(guest_data)
         
         if guest_number:
-            log_success(f"Guest record saved (Guest No: {guest_number})")
+            log_success(f"Visitor record saved (Visitor No: {guest_number})")
             
             # Safe Firebase sync
             try:
@@ -489,14 +489,14 @@ def store_guest_in_database(guest_info):
                     guest_info['plate_number'], 
                     guest_info['office']
                 )
-                log_success("Guest synced to Firebase")
+                log_success("Visitor synced to Firebase")
             except Exception as e:
                 log_warning(f"Firebase sync failed: {e}")
             
             return True
         else:
-            log_error("Failed to save guest record")
+            log_error("Failed to save visitor record")
             return False
     except Exception as e:
-        log_error(f"Error storing guest in database: {e}")
+        log_error(f"Error storing visitor in database: {e}")
         return False

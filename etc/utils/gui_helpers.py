@@ -97,7 +97,7 @@ def get_guest_info_gui(detected_name=""):
     
     # Create window
     info_window = tk.Toplevel()
-    info_window.title("Guest Registration")
+    info_window.title("Visitor Registration")
     
     if use_office_buttons and offices_data:
         info_window.geometry("600x500")
@@ -123,7 +123,7 @@ def get_guest_info_gui(detected_name=""):
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
     
     # Title
-    title_label = tk.Label(main_frame, text="🎫 GUEST REGISTRATION", 
+    title_label = tk.Label(main_frame, text="🎫 VISITOR REGISTRATION", 
                           font=("Arial", 18, "bold"), fg="#333333", bg="#FFFFFF")
     title_label.pack(pady=(0, 20))
     
@@ -701,7 +701,7 @@ def show_guest_verification_gui(guest_info, verification_data):
             details[check_name] = f"{'✅' if status else '❌'} {message}"
     
     show_results_gui(
-        title="Guest Verification Results",
+        title="Visitor Verification Results",
         text=message,
         success=success,
         details=details

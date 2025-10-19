@@ -1,4 +1,4 @@
-# ui/guest_gui.py - Responsive Guest GUI for 15" Square Touch Screen (1024x768)
+# ui/guest_gui.py - Responsive Visitor GUI for 15" Square Touch Screen (1024x768)
 
 import tkinter as tk
 from tkinter import ttk
@@ -146,7 +146,7 @@ class GuestVerificationGUI:
         # Left panel - Status indicators
         self.create_left_panel(panels_container)
         
-        # Right panel - Guest information
+        # Right panel - Visitor information
         self.create_right_panel(panels_container)
         
         # Footer
@@ -318,7 +318,7 @@ class GuestVerificationGUI:
         icon.config(text=config[1], fg=config[2], font=("Arial", icon_font_size))
     
     def create_right_panel(self, parent):
-        """Create responsive right panel with guest information"""
+        """Create responsive right panel with visitor information"""
         right_frame = tk.Frame(parent, bg='#8B4513')
         right_frame.pack(side="right", fill="both", expand=True)
         
@@ -352,14 +352,14 @@ class GuestVerificationGUI:
     
     def create_hidden_panels(self):
         """Create panels that will be shown later with responsive design"""
-        # Guest info panel
+        # Visitor info panel
         self.guest_info_panel = tk.Frame(self.details_content, bg='#e8f5e9', relief='ridge', bd=2)
         
         # Responsive font for panel titles
         panel_title_font = max(13, int(self.screen_width / 65))
         panel_title_padding = max(12, int(self.screen_height * 0.015))
         
-        tk.Label(self.guest_info_panel, text="👤 VISITORS DETAILS", 
+        tk.Label(self.guest_info_panel, text="👤 VISITOR DETAILS", 
                 font=("Arial", panel_title_font, "bold"), fg="#2e7d32", bg='#e8f5e9').pack(pady=panel_title_padding)
         
         self.guest_details_frame = tk.Frame(self.guest_info_panel, bg='#e8f5e9')
@@ -393,7 +393,7 @@ class GuestVerificationGUI:
                 fg="#FFFFFF", bg='#46230a').pack(expand=True)
     
     def show_guest_info(self, guest_info):
-        """Display guest information with responsive design"""
+        """Display visitor information with responsive design"""
         try:
             self.initial_message.pack_forget()
             
@@ -406,15 +406,15 @@ class GuestVerificationGUI:
             value_font_size = max(10, int(self.screen_width / 85))
             
             info_items = [
-                ("Name:", guest_info.get('name', 'Guest')),
+                ("Name:", guest_info.get('name', 'Visitor')),
                 ("Plate Number:", guest_info.get('plate_number', 'N/A')),
                 ("Office Visiting:", guest_info.get('office', 'N/A')),
-                ("Status:", guest_info.get('status', 'NEW GUEST'))
+                ("Status:", guest_info.get('status', 'NEW VISITOR'))
             ]
             
-            # Add guest number if returning guest
+            # Add visitor number if returning visitor
             if 'guest_number' in guest_info:
-                info_items.insert(1, ("Guest No:", guest_info.get('guest_number', 'N/A')))
+                info_items.insert(1, ("Visitor No:", guest_info.get('guest_number', 'N/A')))
             
             for label, value in info_items:
                 row_spacing = max(2, int(self.screen_height * 0.003))
@@ -427,11 +427,11 @@ class GuestVerificationGUI:
                 tk.Label(row, text=value, font=("Arial", value_font_size), 
                         fg="#2e7d32", bg='#e8f5e9').pack(side="left", padx=(8, 0))
             
-            # Show the guest info panel with responsive spacing
+            # Show the visitor info panel with responsive spacing
             panel_spacing_y = max(15, int(self.screen_height * 0.02))
             self.guest_info_panel.pack(fill="x", pady=(panel_spacing_y, 0))
         except Exception as e:
-            print(f"Error showing guest info: {e}")
+            print(f"Error showing visitor info: {e}")
 
     def show_verification_summary(self, summary_data):
         """Display verification summary with responsive design"""
@@ -461,7 +461,7 @@ class GuestVerificationGUI:
             print(f"Error showing verification summary: {e}")
 
     def show_final_result(self, result):
-        """Show final verification result - Clean & Professional Design (Guest Version)"""
+        """Show final verification result - Clean & Professional Design (Visitor Version)"""
         try:
             self.verification_complete = True
             
@@ -506,7 +506,7 @@ class GuestVerificationGUI:
                                  fg="#333333", bg='#FFD700')
                 welcome.pack(pady=(0, 15))
                 
-                # Guest info box (plate number and office)
+                # Visitor info box (plate number and office)
                 info_frame = tk.Frame(content, bg='#E8F5E9', bd=0)
                 info_frame.pack(pady=(10, 0), padx=40, fill='x')
                 
@@ -701,7 +701,7 @@ class GuestVerificationGUI:
         """Main GUI loop - UPDATE THIS FUNCTION"""
         try:
             print(f"\n{'='*60}")
-            print(f"🎫 Visitors Verification GUI Started")
+            print(f"🎫 Visitor Verification GUI Started")
             print(f"📱 Responsive Mode: {self.screen_width}x{self.screen_height}")
             if self.is_square_display:
                 print(f"📺 Display Type: Square/4:3 Touch Screen Optimized")
