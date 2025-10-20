@@ -1402,7 +1402,7 @@ class AdminPanelGUI:
             row3.pack(fill="x")
             
             # Row 1 cards
-            self.create_function_card(row1, "👤", "Enroll New User", 
+            self.create_function_card(row1, "👤", "Register New User", 
                                      "Register student/staff with fingerprint",
                                      self.enroll_user, self.colors['success'], "enroll")
             
@@ -1410,7 +1410,7 @@ class AdminPanelGUI:
                                      "Display all registered users",
                                      self.view_users, self.colors['info'], "view_users")
             
-            self.create_function_card(row1, "🗑️", "Delete User", 
+            self.create_function_card(row1, "🗑️", "Update User", 
                                      "Remove user fingerprint",
                                      self.delete_user, self.colors['accent'], "delete_fingerprint")
             

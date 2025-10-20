@@ -327,12 +327,21 @@ class GuestVerificationGUI:
             result_card.place(relx=0.5, rely=0.5, anchor='center', 
                              width=card_width, height=card_height)
             
+            # Timestamp label in the top-right corner
+            timestamp = result.get('timestamp', 'N/A')
+            time_action = result.get('time_action', 'IN')
+            
+            time_label_frame = tk.Frame(result_card, bg='#FFD700')
+            time_label_frame.pack(side="top", anchor="ne", padx=15, pady=10)
+            
+            tk.Label(time_label_frame, text=f"Time {time_action}:", font=("Arial", 17, "bold"), fg="#333", bg='#FFD700').pack(side="left")
+            tk.Label(time_label_frame, text=timestamp, font=("Arial", 17), fg="#333", bg='#FFD700').pack(side="left", padx=(5,0))
+
+
             content = tk.Frame(result_card, bg='#FFD700')
-            content.pack(fill='both', expand=True, padx=30, pady=25)
+            content.pack(fill='both', expand=True, padx=30, pady=5)
             
             if result.get('verified', False):
-                # --- THIS IS THE FIX ---
-                time_action = result.get('time_action', 'IN')
                 name = result.get('name', 'Visitor')
 
                 icon_label = tk.Label(content, text="✓", 
@@ -341,11 +350,9 @@ class GuestVerificationGUI:
                 icon_label.pack(pady=(20, 15))
                 
                 if time_action == 'OUT':
-                    # Custom message for TIME OUT
                     title_text = "Time Out Recorded"
                     main_message = f"Goodbye, {name}"
                 else:
-                    # Default message for TIME IN
                     title_text = "Verification Successful"
                     main_message = f"Welcome, {name}"
 
@@ -359,7 +366,6 @@ class GuestVerificationGUI:
                                  fg="#333333", bg='#FFD700',
                                  wraplength=card_width - 80)
                 welcome.pack(pady=(0, 20))
-                # --- END OF FIX ---
                 
                 # Visitor info box
                 info_frame = tk.Frame(content, bg='#E8F5E9', bd=1, relief='solid')
@@ -367,11 +373,11 @@ class GuestVerificationGUI:
                 
                 plate = result.get('plate_number', 'N/A')
                 office = result.get('office', 'N/A')
-                timestamp = result.get('timestamp', 'N/A')
+                expiration_date = result.get('expiration_date', 'N/A')
 
-                info_text = f"Time {time_action}: {timestamp}\nPlate No: {plate}"
-                if office != 'N/A' and time_action == 'IN':
-                     info_text += f"   |   Visiting: {office}"
+                info_text = f"License Expires: {expiration_date}"
+                if time_action == 'IN':
+                    info_text += f"\nPlate No: {plate}   |   Visiting: {office}"
 
                 info_label = tk.Label(info_frame, 
                                     text=info_text, 
@@ -382,7 +388,7 @@ class GuestVerificationGUI:
                 info_label.pack()
                 
             else:
-                # Failure layout remains the same
+                # Failure layout
                 icon_label = tk.Label(content, text="✕", font=("Arial", 90, "bold"), fg="#F44336", bg='#FFD700')
                 icon_label.pack(pady=(20, 15))
                 title = tk.Label(content, text="Verification Failed", font=("Arial", 32, "bold"), fg="#C62828", bg='#FFD700')
@@ -402,7 +408,7 @@ class GuestVerificationGUI:
         except Exception as e:
             print(f"Error showing final result: {e}")
             self.close()
-            
+               
     def update_status(self, updates):
         """Update status from the queue in a thread-safe way"""
         try:

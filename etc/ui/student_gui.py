@@ -110,6 +110,7 @@ class StudentVerificationGUI:
         self.time_string = tk.StringVar()
         self.date_string = tk.StringVar()
         self.update_time()
+        self.user_details = {}
         
     def update_time(self):
         try:
@@ -308,8 +309,14 @@ class StudentVerificationGUI:
 
     def show_user_info(self, user_info):
         try:
+            # --- THIS IS THE FIX ---
+            # Store the complete user_info dictionary, which includes 'license_expiration'
+            self.user_details = user_info
+            # --- END OF FIX ---
+
             if hasattr(self, 'initial_message'):
                 self.initial_message.pack_forget()
+                
             user_type = user_info.get('user_type', 'STUDENT')
             if user_type == 'STAFF':
                 if hasattr(self, 'main_title_label'):
@@ -321,16 +328,20 @@ class StudentVerificationGUI:
                     self.main_title_label.config(text="STUDENT VERIFICATION")
                 if hasattr(self, 'user_type_title_label'):
                     self.user_type_title_label.config(text="STUDENT INFORMATION")
+
             for widget in self.user_details_frame_right.winfo_children():
                 widget.destroy()
+
             label_font_size = max(10, int(self.screen_width / 85))
             value_font_size = max(10, int(self.screen_width / 85))
+            
             info_items = [
                 ("Name:", user_info.get('name', 'N/A')),
                 ("Student ID:", user_info.get('student_id', 'N/A')),
                 ("Course:", user_info.get('course', 'N/A')),
                 ("User Type:", user_info.get('user_type', 'STUDENT'))
             ]
+
             for label, value in info_items:
                 row_spacing = max(2, int(self.screen_height * 0.003))
                 row = tk.Frame(self.user_details_frame_right, bg='#e3f2fd')
@@ -340,11 +351,12 @@ class StudentVerificationGUI:
                         fg="#333333", bg='#e3f2fd', width=label_width, anchor="w").pack(side="left")
                 tk.Label(row, text=value, font=("Arial", value_font_size), 
                         fg="#1565c0", bg='#e3f2fd').pack(side="left", padx=(8, 0))
+
             panel_spacing_y = max(15, int(self.screen_height * 0.02))
             self.user_info_panel_right.pack(fill="both", expand=True, pady=(0, panel_spacing_y))
         except Exception as e:
             print(f"Error showing user info: {e}")
-
+        
     def show_final_result(self, result):
         """Show final verification result - With custom messages for IN/OUT"""
         try:
@@ -357,89 +369,69 @@ class StudentVerificationGUI:
             result_card.place(relx=0.5, rely=0.5, anchor='center', 
                              width=card_width, height=card_height)
             
+            timestamp = result.get('timestamp', 'N/A')
+            time_action = result.get('time_action', 'IN')
+            
+            time_label_frame = tk.Frame(result_card, bg='#FFD700')
+            time_label_frame.pack(side="top", anchor="ne", padx=15, pady=10)
+            
+            tk.Label(time_label_frame, text=f"Time {time_action}:", font=("Arial", 17, "bold"), fg="#333", bg='#FFD700').pack(side="left")
+            tk.Label(time_label_frame, text=timestamp, font=("Arial", 17), fg="#333", bg='#FFD700').pack(side="left", padx=(5,0))
+
             content = tk.Frame(result_card, bg='#FFD700')
-            content.pack(fill='both', expand=True, padx=30, pady=25)
+            content.pack(fill='both', expand=True, padx=30, pady=5)
             
             if result.get('verified', False):
-                # --- THIS IS THE FIX ---
-                time_action = result.get('time_action', 'IN')
                 name = result.get('name', 'User')
 
-                # Format name
                 if ',' in name:
                     parts = name.split(',')
                     if len(parts) >= 2:
                         name = f"{parts[1].strip()} {parts[0].strip()}"
 
-                icon_label = tk.Label(content, text="✓", 
-                                    font=("Arial", 90, "bold"), 
-                                    fg="#4CAF50", bg='#FFD700')
+                icon_label = tk.Label(content, text="✓", font=("Arial", 90, "bold"), fg="#4CAF50", bg='#FFD700')
                 icon_label.pack(pady=(20, 15))
 
                 if time_action == 'OUT':
-                    # Custom message for TIME OUT
                     title_text = "Time Out Recorded"
                     main_message = f"Goodbye, {name}"
                 else:
-                    # Default message for TIME IN
                     title_text = "Verification Successful"
                     main_message = f"Welcome, {name}"
 
-                title = tk.Label(content, text=title_text, 
-                               font=("Arial", 32, "bold"), 
-                               fg="#2E7D32", bg='#FFD700')
+                title = tk.Label(content, text=title_text, font=("Arial", 32, "bold"), fg="#2E7D32", bg='#FFD700')
                 title.pack(pady=(0, 20))
                 
-                welcome = tk.Label(content, text=main_message, 
-                                 font=("Arial", 22), 
-                                 fg="#333333", bg='#FFD700',
-                                 wraplength=card_width - 80)
+                welcome = tk.Label(content, text=main_message, font=("Arial", 22), fg="#333333", bg='#FFD700', wraplength=card_width - 80)
                 welcome.pack(pady=(0, 20))
-                # --- END OF FIX ---
 
-                # Time info remains the same
-                timestamp = result.get('timestamp', 'N/A')
-                expiration_date = result.get('expiration_date', 'N/A')
+                # --- THIS IS THE FIX ---
+                # On Time In, 'expiration_date' comes from the license scan result.
+                # On Time Out, it's not in the result, so we get 'license_expiration'
+                # from the user data we stored earlier.
+                expiration_date = result.get('expiration_date')
+                if not expiration_date or expiration_date == 'N/A':
+                    expiration_date = self.user_details.get('license_expiration', 'N/A')
+                # --- END OF FIX ---
                 
-                time_frame = tk.Frame(content, bg='#E8F5E9', bd=1, relief='solid')
-                time_frame.pack(pady=(15, 0), padx=40, fill='x')
+                info_frame = tk.Frame(content, bg='#E8F5E9', bd=1, relief='solid')
+                info_frame.pack(pady=(15, 0), padx=40, fill='x')
                 
-                time_label = tk.Label(time_frame, 
-                                    text=f"Time {time_action}: {timestamp}\nLicense Expires: {expiration_date}", 
-                                    font=("Arial", 18), 
-                                    fg="#1B5E20", bg='#E8F5E9',
-                                    pady=15)
-                time_label.pack()
+                info_label = tk.Label(info_frame, text=f"License Expires: {expiration_date}", font=("Arial", 18), fg="#1B5E20", bg='#E8F5E9', pady=15)
+                info_label.pack()
                 
             else:
                 # Failure layout remains the same
-                icon_label = tk.Label(content, text="✕", 
-                                    font=("Arial", 90, "bold"), 
-                                    fg="#F44336", bg='#FFD700')
+                icon_label = tk.Label(content, text="✕", font=("Arial", 90, "bold"), fg="#F44336", bg='#FFD700')
                 icon_label.pack(pady=(20, 15))
-                
-                title = tk.Label(content, text="Verification Failed", 
-                               font=("Arial", 32, "bold"), 
-                               fg="#C62828", bg='#FFD700')
+                title = tk.Label(content, text="Verification Failed", font=("Arial", 32, "bold"), fg="#C62828", bg='#FFD700')
                 title.pack(pady=(0, 25))
-                
                 error_frame = tk.Frame(content, bg='#FFEBEE', bd=1, relief='solid')
                 error_frame.pack(pady=(0, 20), padx=40, fill='x')
-                
                 reason_text = result.get('reason', 'Unknown error')
-                reason = tk.Label(error_frame, 
-                                text=reason_text, 
-                                font=("Arial", 16), 
-                                fg="#C62828", bg='#FFEBEE',
-                                wraplength=card_width - 100,
-                                justify='center',
-                                pady=20)
+                reason = tk.Label(error_frame, text=reason_text, font=("Arial", 16), fg="#C62828", bg='#FFEBEE', wraplength=card_width - 100, justify='center', pady=20)
                 reason.pack()
-                
-                help_text = tk.Label(content, 
-                                   text="Please contact security for assistance.", 
-                                   font=("Arial", 14), 
-                                   fg="#757575", bg='#FFD700')
+                help_text = tk.Label(content, text="Please contact security for assistance.", font=("Arial", 14), fg="#757575", bg='#FFD700')
                 help_text.pack(pady=(15, 0))
             
             self.root.after(4000, self.close)
@@ -447,7 +439,7 @@ class StudentVerificationGUI:
         except Exception as e:
             print(f"Error showing final result: {e}")
             self.close()
-                                                
+           
     def update_status(self, updates):
         try:
             for key, value in updates.items():
