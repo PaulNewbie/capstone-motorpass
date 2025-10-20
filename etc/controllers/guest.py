@@ -274,6 +274,7 @@ def _handle_automatic_timeout(detected_name, guest_info, image_path, ocr_text, s
         }
     })
     
+    force_camera_cleanup()
     status_callback({'current_step': '🔒 Security verification required for timeout...'})
     
     security_result = timeout_security_verification(guest_info)

@@ -91,11 +91,22 @@ def _run_verification_flow_with_cleanup(status_callback):
         else:
             license_expiration_valid = _check_license_expiration(user_info)
             if not license_expiration_valid:
+                status_callback({
+                    'current_step': 'Access Denied: License is expired.',
+                    'license_status': 'EXPIRED'
+                })
                 _record_expired_license_attempt(user_info)
-                status_callback({'current_step': "⚠️ License has expired, but proceeding..."})
+                
+                return {
+                    'verified': False,
+                    'reason': f"Access Denied: License expired on {user_info.get('license_expiration', 'N/A')}",
+                    'name': user_info.get('name', 'N/A'),
+                    'timestamp': datetime.now().strftime("%H:%M:%S"),
+                    'time_action': 'IN'
+                }
 
             return _verify_license_and_record_time_in(
-                status_callback, user_info, license_expiration_valid
+                status_callback, user_info, True
             )
     finally:
         # This ALWAYS runs in the background thread, preventing GUI freezes.
@@ -222,6 +233,30 @@ def _verify_license_and_record_time_in(status_callback, user_info, license_expir
             elif reason == "cancelled": return handle_license_capture_cancelled(status_callback)
             else: return handle_license_capture_error(status_callback, reason)
         try:
+            
+            from etc.services.license_reader import extract_text_from_image, _extract_expiration_date
+
+            ocr_text = extract_text_from_image(current_image_path)
+            expiration_date = _extract_expiration_date(ocr_text)
+
+            if expiration_date:
+                today = datetime.now().date()
+                exp_date = datetime.strptime(expiration_date, '%Y/%m/%d').date()
+                if exp_date < today:
+                    days_overdue = (today - exp_date).days
+                    log_error(f"DENIED: Student license expired {days_overdue} days ago.")
+                    status_callback({'license_status': 'EXPIRED', 'current_step': f'❌ Access Denied: License expired.'})
+                    cleanup_image_file(current_image_path)
+                    
+                    # Immediately return a failure result and stop the entire process.
+                    return {
+                        'verified': False,
+                        'reason': f"Access Denied: License expired on {expiration_date}",
+                        'name': user_info.get('name', 'N/A'),
+                        'timestamp': datetime.now().strftime("%H:%M:%S"),
+                        'time_action': 'IN'
+                    }
+                    
             verification_result = complete_verification_flow(
                 image_path=current_image_path,
                 fingerprint_info=fingerprint_info,

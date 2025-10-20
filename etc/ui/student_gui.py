@@ -264,7 +264,7 @@ class StudentVerificationGUI:
         badge.config(bg=config[0], text=status.upper(), font=("Arial", badge_font_size, "bold"))
         icon_font_size = max(14, int(self.screen_width / 60))
         icon.config(text=config[1], fg=config[2], font=("Arial", icon_font_size))
-
+        
     def create_right_panel(self, parent):
         right_frame = tk.Frame(parent, bg='#8B4513')
         right_frame.pack(side="right", fill="both", expand=True)
@@ -361,6 +361,13 @@ class StudentVerificationGUI:
         """Show final verification result - With custom messages for IN/OUT"""
         try:
             self.verification_complete = True
+
+            # --- START OF ADDED CODE ---
+            # If license is expired, force verification to fail
+            if self.license_status.get() == "EXPIRED":
+                result['verified'] = False
+                result['reason'] = "License is expired."
+            # --- END OF ADDED CODE ---
             
             card_width = 800
             card_height = 500
@@ -439,7 +446,7 @@ class StudentVerificationGUI:
         except Exception as e:
             print(f"Error showing final result: {e}")
             self.close()
-           
+               
     def update_status(self, updates):
         try:
             for key, value in updates.items():
