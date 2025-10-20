@@ -56,13 +56,10 @@ def restart_application():
     
     # Clean up system resources
     cleanup_system()
-    
-    # --- THIS IS THE FIX ---
-    # Add a delay to allow background threads (like camera cleanup) to fully finish
-    # before the main process exits and restarts.
+
     print("⏳ Waiting for cleanup to complete...")
     # time.sleep(10)
-    # -----------------------
+
     
     script_path = os.path.abspath(__file__)
     subprocess.Popen([sys.executable, script_path])
