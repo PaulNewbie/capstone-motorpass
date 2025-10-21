@@ -21,7 +21,7 @@ from etc.services.license_reader import (
 )
 
 # Helper imports
-from etc.utils.led_helpers import execute_failure_feedback_concurrent
+from etc.utils.led_helpers import play_alarm_feedback
 from etc.utils.verification_helpers import *
 from etc.utils.message import *
 
@@ -74,12 +74,16 @@ def _run_verification_flow_with_cleanup(status_callback):
     """
     try:
         # Step 1: Helmet Verification
+        play_processing()
         if not _verify_helmet_step(status_callback):
+            play_failure()
             return {'verified': False, 'reason': MSG_HELMET_FAILED}
 
         # Step 2: Fingerprint Verification
+        play_processing()
         user_info = _verify_fingerprint_step(status_callback)
         if not user_info:
+            play_failure()
             return {'verified': False, 'reason': MSG_FINGERPRINT_FAILED}
 
         # Step 3: Check Time IN/OUT Status
@@ -247,6 +251,7 @@ def _verify_license_and_record_time_in(status_callback, user_info, license_expir
                     log_error(f"DENIED: Student license expired {days_overdue} days ago.")
                     status_callback({'license_status': 'EXPIRED', 'current_step': f'❌ Access Denied: License expired.'})
                     cleanup_image_file(current_image_path)
+                    play_alarm_feedback()
                     
                     # Immediately return a failure result and stop the entire process.
                     return {
@@ -283,6 +288,7 @@ def _verify_license_and_record_time_in(status_callback, user_info, license_expir
                         return handle_manual_override_failure(status_callback, current_image_path)
         except ValueError as e:
             if "STUDENT_PERMIT_DETECTED" in str(e):
+                play_alarm_feedback()
                 return handle_student_permit_denied(status_callback, current_image_path)
             else:
                 raise e
@@ -345,6 +351,7 @@ def _record_successful_time_in(status_callback, user_info, final_result, license
             play_success()
             result = final_result
         else:
+            play_failure()
             return handle_time_in_failure(status_callback)
     else:
         verification_summary = create_verification_summary(
@@ -354,9 +361,11 @@ def _record_successful_time_in(status_callback, user_info, final_result, license
         status_callback({'verification_summary': verification_summary})
         if record_time_in(user_info):
             timestamp = handle_time_in_success(status_callback)
+            play_success()
             result = build_standard_success_result(user_info, timestamp, 'IN')
             result['expiration_date'] = user_info.get('license_expiration', 'N/A')
         else:
+            play_failure()
             return handle_time_in_failure(status_callback)
     status_callback({'final_result': result})
     cleanup_buzzer()

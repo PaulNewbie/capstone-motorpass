@@ -224,14 +224,14 @@ def set_led_white_lighting():
         time.sleep(0.1)
         
         # Use progress at 100% with white color for solid white (no effects)
-        return _led_client.show_progress(100, (150, 150, 150))
+        return _led_client.show_progress(100, (50, 50, 50))
     return False
 
 def set_led_failed_fast_blink():
     """Fast red blinking for failures"""
     if _led_client and _led_client.is_available():
         # Fast red blinking - 5 times, fast speed
-        return _led_client.quick_flash((255, 0, 0), times=5, speed=0.1)
+        return _led_client.quick_flash((255, 0, 0), times=20, speed=0.1)
     return False
 
 # =============================================================================

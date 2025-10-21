@@ -90,7 +90,7 @@ class QueueManager:
                     data['synced_at'] = firestore.SERVER_TIMESTAMP
                     
                     # Save to Firebase
-                    firebase_db.collection(COLLECTIONS[collection]).document(document_id).set(data, merge=True)
+                    firebase_db.collection(COLLECTIONS[collection]).document(document_id).set(data, merge=True, timeout=5)
                     
                     processed += 1
                     print(f"✅ Synced: {collection}/{document_id}")

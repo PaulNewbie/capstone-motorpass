@@ -2,6 +2,22 @@
 import RPi.GPIO as GPIO
 import time
 import threading
+
+# --- START OF FIX ---
+# This code block helps Python find the 'config.py' file from the project root
+import sys
+import os
+
+# Get the absolute path of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Navigate three levels up to get to the project root (hardware -> services -> etc -> MotorPass)
+project_root = os.path.abspath(os.path.join(script_dir, '..', '..', '..'))
+
+# Add the project root to the Python path
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+# --- END OF FIX ---
+
 from config import ENABLE_BUZZER
 
 # Disable GPIO warnings

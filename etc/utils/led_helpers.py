@@ -9,43 +9,30 @@ import time
 from etc.services.hardware.led_control import *  
 from etc.services.hardware.buzzer_control import *
 
+def play_alarm_feedback():
+    """
+    Plays a fast red LED blink and the failure buzzer sound concurrently.
+    This creates a synchronized audio-visual alarm for critical failures.
+    """
+    if not led_is_available():
+        # If no LEDs, just play the sound
+        play_failure()
+        return
+
+    # Create threads for LED and Buzzer so they run at the same time
+    led_thread = threading.Thread(target=set_led_failed_fast_blink)
+    buzzer_thread = threading.Thread(target=play_failure)
+
+    # Start the threads
+    led_thread.start()
+    buzzer_thread.start()
+
+    # Wait for both threads to complete
+    led_thread.join()
+    buzzer_thread.join()
 
 def execute_failure_feedback_concurrent(status_callback, result_data):
-    """
-    Execute buzzer, LED, and GUI feedback concurrently for failures.
-    All three will start at the same time and run in parallel.
-    
-    Args:
-        status_callback: GUI callback function
-        result_data: Dictionary with failure information
-    """
-    buzzer_duration = 3.0
-    led_duration = 5.0
-    gui_duration = 5.0
-    
-    # Create threads for concurrent execution
-    buzzer_thread = threading.Thread(target=play_failure, daemon=True)
-    led_thread = threading.Thread(target=set_led_failed_fast_blink, daemon=True)
-    gui_thread = threading.Thread(
-        target=lambda: status_callback({'final_result': result_data}),
-        daemon=True
-    )
-    
-    print("🚨 Starting concurrent failure feedback...")
-    start_time = time.time()
-    
-    # Start all threads simultaneously
-    buzzer_thread.start()
-    led_thread.start()
-    gui_thread.start()
-    
-    # Wait for all threads to complete
-    buzzer_thread.join(timeout=buzzer_duration)
-    led_thread.join(timeout=led_duration)
-    gui_thread.join(timeout=gui_duration)
-    
-    elapsed = time.time() - start_time
-    print(f"✅ All failure feedback completed in {elapsed:.2f}s")
+    pass
 
 
 def execute_success_feedback_concurrent(status_callback, result_data, duration=5.0):

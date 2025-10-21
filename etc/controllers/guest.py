@@ -72,9 +72,12 @@ def _run_guest_verification_with_cleanup(status_callback):
     even if the process is exited early.
     """
     try:
+        play_processing()
         if not _verify_helmet_step(status_callback):
+            play_failure()
             return {'verified': False, 'reason': MSG_HELMET_FAILED}
         
+        play_processing()
         return _license_capture_and_processing_loop(status_callback)
     finally:
         # A final, failsafe cleanup call when the entire thread finishes
@@ -129,11 +132,15 @@ def _license_capture_and_processing_loop(status_callback):
                     days_overdue = (today - exp_date).days
                     log_error(f"Guest license expired {days_overdue} days ago.")
                     cleanup_image_file(image_path)
+                    play_alarm_feedback()
                     return handle_expired_license(status_callback, {"name": "Guest"}, days_overdue)
         except ValueError as e:
             if "STUDENT_PERMIT_DETECTED" in str(e):
                 cleanup_image_file(image_path)
+                play_alarm_feedback()
                 return handle_student_permit_denied(status_callback)
+                
+            play_alarm_feedback()
             return handle_verification_failure(status_callback, f'OCR Error: {e}')
         
         ocr_lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
@@ -142,6 +149,7 @@ def _license_capture_and_processing_loop(status_callback):
 
         if _check_if_student_or_staff(detected_name, image_path, status_callback):
             cleanup_image_file(image_path)
+            play_alarm_feedback()
             return handle_verification_failure(status_callback, 'Student/Staff not allowed as visitors')
 
         current_status, guest_info = get_guest_time_status(detected_name)
@@ -287,6 +295,7 @@ def _handle_automatic_timeout(detected_name, guest_info, image_path, ocr_text, s
     else:
         log_error("Security verification failed or cancelled")
         status_callback({'current_step': '❌ Security verification failed - Timeout DENIED'})
+        play_failure()
         cleanup_image_file(image_path)
         return handle_verification_failure(
             status_callback,
@@ -341,6 +350,7 @@ def _process_guest_timeout(guest_info, image_path, ocr_text, status_callback):
         }
     else:
         status_callback({'current_step': '❌ Failed to record TIME OUT'})
+        play_failure()
         cleanup_image_file(image_path)
         return handle_verification_failure(
             status_callback,
@@ -425,6 +435,7 @@ def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_ca
             # --- END OF THE FIX ---
         else:
             status_callback({'current_step': '❌ Failed to record TIME IN'})
+            play_failure()
             cleanup_image_file(image_path)
             return handle_verification_failure(
                 status_callback,
@@ -432,6 +443,7 @@ def _process_new_guest_time_in(guest_info_input, image_path, ocr_text, status_ca
             )
     else:
         status_callback({'current_step': '❌ Visitor verification failed'})
+        play_failure()
         cleanup_image_file(image_path)
         return handle_verification_failure(
             status_callback,

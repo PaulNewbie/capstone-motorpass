@@ -1173,6 +1173,8 @@ def auto_capture_license_rpi(reference_name: str = "", fingerprint_info: Optiona
 
 # ============== VERIFICATION FUNCTIONS ==============
 
+# etc/services/license_reader.py
+
 def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
     """
     MODIFIED to perform OCR only ONCE and pass the text to other functions.
@@ -1210,9 +1212,10 @@ def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
         if normalized_detected_raw and normalized_reference_raw:
             sim_score = difflib.SequenceMatcher(None, normalized_detected_raw, normalized_reference_raw).ratio()
         else:
+            # Fallback similarity check against the whole text if name detection fails
             sim_score = difflib.SequenceMatcher(None, basic_text.lower().replace('\xa0', ' ').replace('\n', ' '), reference_name.lower().strip().replace('\xa0', ' ')).ratio()
 
-        # Pass the basic_text we already have, NOT the image_path
+        # Pass the 'basic_text' we already have, NOT the 'image_path'
         structured_data = extract_name_from_lines(basic_text, reference_name, detected_name, sim_score)
 
         # Package the result
@@ -1233,6 +1236,7 @@ def licenseRead(image_path: str, fingerprint_info: dict) -> NameInfo:
         error_packaged.match_score = 0.0
         return error_packaged
     finally:
+        # IMPORTANT: The temporary image file is cleaned up here
         safe_delete_temp_file(image_path)
 
 def licenseReadGuest(image_path: str, guest_info: dict) -> NameInfo:
@@ -1341,6 +1345,7 @@ def complete_verification_flow(image_path: str, fingerprint_info: dict,
                              license_expiration_valid: bool = True) -> bool:
     try:
         license_result = licenseRead(image_path, fingerprint_info)
+        pass
     except ValueError as e:
         if "STUDENT_PERMIT_DETECTED" in str(e):
             print("❌ Student Permit detected - Verification FAILED")

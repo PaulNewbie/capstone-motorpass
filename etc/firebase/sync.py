@@ -69,36 +69,44 @@ def init_firebase():
         return False
 
 def is_online():
-    """Check internet connection with caching - UPDATE OR ADD THIS FUNCTION"""
-    global _last_connection_check, _last_connection_result
+    """Check internet connection with caching."""
+    global _last_connection_check, _last_connection_result, _connection_cache_duration
     
     import time
     current_time = time.time()
     
-    # Use cached result if recent
+    # Use cached result if recent to avoid repeated checks
     if current_time - _last_connection_check < _connection_cache_duration:
         return _last_connection_result
     
     try:
         import socket
         
-        # Try to connect to Google DNS
-        socket.setdefaulttimeout(3)  # Short timeout
+        # Try to connect to Google's DNS with a short timeout
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)  # Set a 2-second timeout for the connection attempt
         result = sock.connect_ex(("8.8.8.8", 53))
         sock.close()
         
+        is_connected = (result == 0)
+        
         # Cache the result
-        _last_connection_result = (result == 0)
+        _last_connection_result = is_connected
         _last_connection_check = current_time
         
-        return _last_connection_result
+        if is_connected:
+            print("🌐 Connection check: ONLINE")
+        else:
+            print("📴 Connection check: OFFLINE")
+            
+        return is_connected
         
-    except Exception:
+    except socket.error:
         _last_connection_result = False
         _last_connection_check = current_time
+        print("📴 Connection check: OFFLINE (socket error)")
         return False
-
+        
 # =================== CLEAN SYNC FUNCTIONS ===================
 
 def add_guest(name, plate_number, office):
@@ -143,7 +151,7 @@ def add_guest(name, plate_number, office):
                 firebase_db.collection(COLLECTIONS['guests']).document(str(guest_id)).set({
                     **guest_data,
                     'synced_at': firestore.SERVER_TIMESTAMP
-                })
+                }, timeout=5)
                 print(f"🔥 Guest synced instantly: {name}")
             except Exception as e:
                 print(f"⚠️  Instant sync failed, queuing: {e}")
@@ -225,13 +233,13 @@ def record_entry(user_id, user_name, user_type, action):
                 firebase_db.collection(COLLECTIONS['time_tracking']).document(str(time_record_id)).set({
                     **time_data,
                     'synced_at': firestore.SERVER_TIMESTAMP
-                })
+                },timeout=5)
                 
                 # Sync current status
                 firebase_db.collection(COLLECTIONS['current_status']).document(str(user_id)).set({
                     **status_data,
                     'synced_at': firestore.SERVER_TIMESTAMP
-                })
+                },timeout=5)
                 
                 print(f"🔥 Time entry synced instantly: {user_name} - {action}")
                 
@@ -297,7 +305,7 @@ def add_staff(staff_no, name, role, license_num=None, plate_num=None):
                 firebase_db.collection(COLLECTIONS['staff']).document(str(staff_no)).set({
                     **staff_data,
                     'synced_at': firestore.SERVER_TIMESTAMP
-                })
+                }, timeout=5)
                 print(f"🔥 Staff synced instantly: {name}")
             except Exception as e:
                 print(f"⚠️  Instant sync failed, queuing: {e}")
@@ -359,7 +367,7 @@ def add_student(student_id, name, course, license_num=None, plate_num=None):
                 firebase_db.collection(COLLECTIONS['students']).document(str(student_id)).set({
                     **student_data,
                     'synced_at': firestore.SERVER_TIMESTAMP
-                })
+                }, timeout=5)
                 print(f"🔥 Student synced instantly: {name}")
             except Exception as e:
                 print(f"⚠️  Instant sync failed, queuing: {e}")

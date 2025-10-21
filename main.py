@@ -20,17 +20,23 @@ from etc.services.hardware.led_control import (
     set_led_idle,
     cleanup_led_system
 )
+from etc.services.hardware.buzzer_control import init_buzzer, cleanup_buzzer, play_ready
 from etc.services.hardware.rpi_camera import force_camera_cleanup
 from database.db_operations import initialize_all_databases
 
 def initialize_system():
     """Initialize system components"""
-    print(f"🚗 {SYSTEM_NAME} System Initialization")
-    print("="*50)
+    print(f" {SYSTEM_NAME} System Initialization")
+    print("="*20)
     
     # Initialize LED system
     led_ok = init_led_system(red_pin=18, green_pin=16)
     print(f"💡 LED System: {'✅' if led_ok else '❌'}")
+    
+    buzzer_ok = init_buzzer()
+    if buzzer_ok:
+        play_ready() # Beep to confirm it's working
+    print(f"🔊 Buzzer System: {'✅' if buzzer_ok else '❌'}")
     
     # Initialize all databases
     db_ok = initialize_all_databases()
@@ -47,6 +53,7 @@ def cleanup_system():
     try:
         cleanup_led_system()
         force_camera_cleanup()
+        cleanup_buzzer()
     except:
         pass
 
@@ -57,10 +64,8 @@ def restart_application():
     # Clean up system resources
     cleanup_system()
 
-    print("⏳ Waiting for cleanup to complete...")
     # time.sleep(10)
 
-    
     script_path = os.path.abspath(__file__)
     subprocess.Popen([sys.executable, script_path])
     sys.exit(0)
